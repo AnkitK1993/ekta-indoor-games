@@ -530,6 +530,46 @@
         display: flex;
         gap: 8px;
         align-items: center;
+        flex-wrap: wrap;
+      }
+      .division-pill {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 2px 8px;
+        border-radius: 999px;
+        font-size: 10px;
+        font-weight: 700;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+      }
+      .match-kids .division-pill {
+        background: rgba(79, 166, 255, 0.14);
+        color: #7cc0ff;
+      }
+      .match-group-a .division-pill {
+        background: rgba(255, 153, 51, 0.16);
+        color: #ffb86b;
+      }
+      .match-group-b .division-pill {
+        background: rgba(33, 221, 125, 0.16);
+        color: #7fe6a6;
+      }
+      .match-mens .division-pill {
+        background: rgba(130, 130, 255, 0.14);
+        color: #b2b8ff;
+      }
+      .match.match-kids {
+        border-left: 3px solid rgba(79, 166, 255, 0.65);
+      }
+      .match.match-group-a {
+        border-left: 3px solid rgba(255, 153, 51, 0.65);
+      }
+      .match.match-group-b {
+        border-left: 3px solid rgba(33, 221, 125, 0.65);
+      }
+      .match.match-mens {
+        border-left: 3px solid rgba(130, 130, 255, 0.65);
       }
       .live-badge {
         background: var(--live);
@@ -1076,7 +1116,7 @@
         <div class="field">
           <label>Export</label>
           <button class="btn ghost" id="io-export-btn" style="width: 100%">
-            ⬇ Download current data (.json)
+            ⬇ Download current data (.xlsx)
           </button>
         </div>
 
@@ -1096,11 +1136,11 @@
           <input
             type="file"
             id="io-file-input"
-            accept="application/json"
+            accept=".xlsx,.xls"
             style="display: none"
           />
           <button class="btn ghost" id="io-choose-btn" style="width: 100%">
-            📁 Choose JSON file…
+            📁 Choose Excel file…
           </button>
           <div
             id="io-file-summary"
@@ -2968,6 +3008,7 @@
         },
       };
     </script>
+    <script src="https://cdn.sheetjs.com/xlsx-latest/package/dist/xlsx.full.min.js"></script>
     <script type="module">
       import { initializeApp } from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
       import {
@@ -3066,6 +3107,88 @@
       }
       function fmtVenueLine(m) {
         return [m.day, m.time, m.venue].filter(Boolean).join(" · ");
+      }
+
+      function formatSquashCode(code) {
+        if (!code) return "";
+        const kidsRoundMatch = code.match(/^U15-R(\d+)-M(\d+)$/);
+        if (kidsRoundMatch) {
+          return `Kids Round ${kidsRoundMatch[1]} Match ${kidsRoundMatch[2]}`;
+        }
+        const kidsSemis = code.match(/^U15-SF-(\d+)$/);
+        if (kidsSemis) {
+          return `Kids Semifinal ${kidsSemis[1]}`;
+        }
+        if (code === "U15-FINAL") {
+          return "Kids Final";
+        }
+
+        const mensGroup = code.match(/^G([A-Z])-(\d+)$/);
+        if (mensGroup) {
+          return `Mens Group ${mensGroup[1]} Round 1 Match ${mensGroup[2]}`;
+        }
+        const mensSemis = code.match(/^A15-SF-(\d+)$/);
+        if (mensSemis) {
+          return `Mens Semifinal ${mensSemis[1]}`;
+        }
+        if (code === "A15-FINAL") {
+          return "Mens Final";
+        }
+        return code;
+      }
+
+      function formatSquashRoundTag(round) {
+        if (!round) return "";
+        const kidsRound = round.match(/^U15-R(\d+)$/);
+        if (kidsRound) {
+          return `Kids Round ${kidsRound[1]}`;
+        }
+        const mensGroup = round.match(/^G([A-Z])-(\d+)$/);
+        if (mensGroup) {
+          return `Mens Group ${mensGroup[1]} Round 1`;
+        }
+        const kidsSemis = round.match(/^U15-SF$/);
+        if (kidsSemis) {
+          return `Kids Semifinals`;
+        }
+        if (round === "U15-FINAL") {
+          return "Kids Final";
+        }
+        if (round === "A15-SF") {
+          return "Mens Semifinals";
+        }
+        if (round === "A15-F" || round === "A15-FINAL") {
+          return "Mens Final";
+        }
+        return round;
+      }
+
+      function squashDivision(match) {
+        const code = match.code || "";
+        if (code.startsWith("U15-")) {
+          return { label: "Kids", className: "match-kids" };
+        }
+        if (code.startsWith("GA-")) {
+          return { label: "Group A", className: "match-group-a" };
+        }
+        if (code.startsWith("GB-")) {
+          return { label: "Group B", className: "match-group-b" };
+        }
+        if (
+          code.startsWith("A15-SF") ||
+          code === "A15-FINAL" ||
+          code === "A15-F"
+        ) {
+          return { label: "Mens", className: "match-mens" };
+        }
+        return { label: "", className: "" };
+      }
+
+      function squashMatchSort(a, b) {
+        const timeA = timeToMinutes(a.time);
+        const timeB = timeToMinutes(b.time);
+        if (timeA !== timeB) return timeA - timeB;
+        return (a.code || "").localeCompare(b.code || "");
       }
 
       /* Recursively resolve a slot to a display object {name, age, isTbd, isWinnerOf} */
@@ -3294,28 +3417,63 @@
           document.getElementById("io-modal").classList.remove("show"),
         );
 
-      document.getElementById("io-export-btn").addEventListener("click", () => {
-        const exportObj = {
-          exportedAt: new Date().toISOString(),
-          events: state.events,
-          matches: state.matches,
-          pendingPlayers: state.pendingPlayers,
-        };
-        const blob = new Blob([JSON.stringify(exportObj, null, 2)], {
-          type: "application/json",
+      function serializeForExcel() {
+        const events = state.events.map((ev) => ({ ...ev }));
+        const matches = state.matches.map((m) => ({
+          ...m,
+          playerA: m.playerA ? JSON.stringify(m.playerA) : "",
+          playerB: m.playerB ? JSON.stringify(m.playerB) : "",
+        }));
+        const pendingRows = [];
+        Object.entries(state.pendingPlayers || {}).forEach(([eid, players]) => {
+          (players || []).forEach((p) => {
+            pendingRows.push({ eventId: eid, name: p.name, age: p.age || "" });
+          });
+        });
+        return { events, matches, pendingRows };
+      }
+
+      function downloadExcelWorkbook(filename, workbook) {
+        const wbout = XLSX.write(workbook, {
+          bookType: "xlsx",
+          type: "array",
+        });
+        const blob = new Blob([wbout], {
+          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         });
         const url = URL.createObjectURL(blob);
         const a = document.createElement("a");
-        const stamp = new Date()
-          .toISOString()
-          .replace(/[:.]/g, "-")
-          .slice(0, 19);
         a.href = url;
-        a.download = `ekta-games-export-${stamp}.json`;
+        a.download = filename;
         document.body.appendChild(a);
         a.click();
         a.remove();
         URL.revokeObjectURL(url);
+      }
+
+      document.getElementById("io-export-btn").addEventListener("click", () => {
+        const { events, matches, pendingRows } = serializeForExcel();
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(
+          wb,
+          XLSX.utils.json_to_sheet(events),
+          "Events",
+        );
+        XLSX.utils.book_append_sheet(
+          wb,
+          XLSX.utils.json_to_sheet(matches),
+          "Matches",
+        );
+        XLSX.utils.book_append_sheet(
+          wb,
+          XLSX.utils.json_to_sheet(pendingRows),
+          "PendingPlayers",
+        );
+        const stamp = new Date()
+          .toISOString()
+          .replace(/[:.]/g, "-")
+          .slice(0, 19);
+        downloadExcelWorkbook(`ekta-games-export-${stamp}.xlsx`, wb);
         toast("⬇ <b>Export downloaded</b>");
       });
 
@@ -3339,20 +3497,64 @@
           const reader = new FileReader();
           reader.onload = (evt) => {
             try {
-              const data = JSON.parse(evt.target.result);
-              if (!Array.isArray(data.events) || !Array.isArray(data.matches)) {
+              const data = new Uint8Array(evt.target.result);
+              const workbook = XLSX.read(data, { type: "array" });
+              const eventsSheet = workbook.Sheets.Events;
+              const matchesSheet = workbook.Sheets.Matches;
+              if (!eventsSheet || !matchesSheet) {
                 throw new Error(
-                  'File must contain "events" and "matches" arrays.',
+                  'Excel file must contain "Events" and "Matches" sheets.',
                 );
               }
-              pendingImportData = data;
-              const pendingCount = data.pendingPlayers
-                ? Object.values(data.pendingPlayers).reduce(
-                    (s, arr) => s + (arr ? arr.length : 0),
-                    0,
-                  )
-                : 0;
-              summaryEl.innerHTML = `<b>${file.name}</b><br>${data.events.length} events · ${data.matches.length} matches · ${pendingCount} pending players`;
+              const events = XLSX.utils.sheet_to_json(eventsSheet, {
+                defval: null,
+              });
+              const matches = XLSX.utils
+                .sheet_to_json(matchesSheet, { defval: null })
+                .map((row) => {
+                  const parsed = { ...row };
+                  if (typeof parsed.playerA === "string" && parsed.playerA) {
+                    try {
+                      parsed.playerA = JSON.parse(parsed.playerA);
+                    } catch (innerErr) {
+                      throw new Error("Invalid playerA JSON in imported file.");
+                    }
+                  }
+                  if (typeof parsed.playerB === "string" && parsed.playerB) {
+                    try {
+                      parsed.playerB = JSON.parse(parsed.playerB);
+                    } catch (innerErr) {
+                      throw new Error("Invalid playerB JSON in imported file.");
+                    }
+                  }
+                  return parsed;
+                });
+              const pendingPlayers = {};
+              const pendingSheet = workbook.Sheets.PendingPlayers;
+              if (pendingSheet) {
+                const pendingRows = XLSX.utils.sheet_to_json(pendingSheet, {
+                  defval: null,
+                });
+                pendingRows.forEach((row) => {
+                  if (!row.eventId || !row.name) return;
+                  pendingPlayers[row.eventId] =
+                    pendingPlayers[row.eventId] || [];
+                  pendingPlayers[row.eventId].push({
+                    name: row.name,
+                    age: row.age || null,
+                  });
+                });
+              }
+              pendingImportData = {
+                events,
+                matches,
+                pendingPlayers,
+              };
+              const pendingCount = Object.values(pendingPlayers).reduce(
+                (s, arr) => s + (arr ? arr.length : 0),
+                0,
+              );
+              summaryEl.innerHTML = `<b>${file.name}</b><br>${events.length} events · ${matches.length} matches · ${pendingCount} pending players`;
               summaryEl.style.display = "block";
               overrideBtn.style.display = "block";
             } catch (err) {
@@ -3360,7 +3562,7 @@
               errEl.style.display = "block";
             }
           };
-          reader.readAsText(file);
+          reader.readAsArrayBuffer(file);
         });
 
       function chunkArray(arr, size) {
@@ -3669,10 +3871,21 @@
           actions = `<div class="match-actions">${btns.join("")}</div>`;
         }
 
+        const displayCode =
+          m.eventId === "squash" ? formatSquashCode(m.code) : m.code;
+        const division =
+          m.eventId === "squash"
+            ? squashDivision(m)
+            : { label: "", className: "" };
+        const venueText =
+          m.eventId === "squash" ? "" : m.venue ? ` · ${m.venue}` : "";
         return `
-  <div class="match ${isLive ? "is-live" : ""}" data-matchid="${m.matchId}">
+  <div class="match ${isLive ? "is-live" : ""} ${division.className}" data-matchid="${m.matchId}">
     <div class="match-top">
-      <span class="match-info">${m.code || ""} ${m.time ? "· " + m.time : ""} ${m.venue ? "· " + m.venue : ""}</span>
+      <span class="match-info">
+        ${division.label ? `<span class="division-pill ${division.className}">${division.label}</span>` : ""}
+        ${displayCode || ""}${m.time ? ` · ${m.time}` : ""}${venueText}
+      </span>
       ${isLive ? '<span class="live-badge"><span class="live-dot"></span>LIVE</span>' : ""}
     </div>
     <div class="players">
@@ -3759,17 +3972,25 @@
             } else {
               const evMatches = state.matches
                 .filter((m) => m.eventId === ev.id)
-                .sort((a, b) => timeToMinutes(a.time) - timeToMinutes(b.time));
-              const rounds = [...new Set(evMatches.map((m) => m.round))];
-              bodyHtml = rounds
-                .map((r) => {
-                  const rm = evMatches.filter((m) => m.round === r);
-                  return (
-                    `<div class="round-label">${r}</div>` +
-                    rm.map(renderMatchRow).join("")
-                  );
-                })
-                .join("");
+                .sort((a, b) =>
+                  ev.id === "squash"
+                    ? squashMatchSort(a, b)
+                    : timeToMinutes(a.time) - timeToMinutes(b.time),
+                );
+              if (ev.id === "squash") {
+                bodyHtml = evMatches.map(renderMatchRow).join("");
+              } else {
+                const rounds = [...new Set(evMatches.map((m) => m.round))];
+                bodyHtml = rounds
+                  .map((r) => {
+                    const rm = evMatches.filter((m) => m.round === r);
+                    return (
+                      `<div class="round-label">${r}</div>` +
+                      rm.map(renderMatchRow).join("")
+                    );
+                  })
+                  .join("");
+              }
             }
             const total = state.matches.filter(
               (m) => m.eventId === ev.id,
@@ -3846,8 +4067,12 @@
         html += matched
           .map((m) => {
             const ev = eventById(m.eventId);
+            const roundText =
+              ev && ev.id === "squash"
+                ? formatSquashRoundTag(m.round)
+                : m.round;
             return `<div class="event-card open" style="margin-bottom:10px;"><div class="event-body" style="border-top:none;">
-      <div class="round-label">${ev ? ev.name : m.eventId} · ${m.round}</div>
+      <div class="round-label">${ev ? ev.name : m.eventId} · ${roundText}</div>
       ${renderMatchRow(m)}
     </div></div>`;
           })
