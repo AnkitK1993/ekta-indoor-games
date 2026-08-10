@@ -211,17 +211,6 @@
     border-radius:6px; font-size:12px; color:var(--muted);
   }
 
-  /* ===== Up Next widget ===== */
-  .upnext-scroll{display:flex; gap:10px; overflow-x:auto; padding-bottom:6px; scrollbar-width:none;}
-  .upnext-scroll::-webkit-scrollbar{display:none;}
-  .upnext-card{
-    flex:0 0 auto; width:190px; background:var(--surface); border:1px solid var(--border);
-    border-radius:12px; padding:12px; box-shadow:var(--shadow);
-  }
-  .upnext-time{font-family:'IBM Plex Mono'; font-size:11px; color:var(--saffron); font-weight:600;}
-  .upnext-sport{font-size:10px; color:var(--muted); text-transform:uppercase; letter-spacing:.04em; margin:2px 0 8px;}
-  .upnext-players{font-size:12.5px; font-weight:600; line-height:1.5;}
-
   /* ===== Search results ===== */
   .search-results{margin-top:16px;}
   .search-result-header{font-size:12px; color:var(--muted); margin-bottom:8px;}
@@ -338,10 +327,7 @@
   <div id="search-results" style="display:none;"></div>
 
   <div id="home-content">
-    <div id="upnext-section"></div>
-    <div id="events-list"></div>
-  </div>
-</main>
+
 
 <footer class="app-footer">
   Ekta Society · Independence Day Sports 2026
@@ -911,25 +897,6 @@ function renderChips(){
   sportWrap.querySelectorAll('button').forEach(b=> b.addEventListener('click', ()=>{ state.filters.sport=b.dataset.sport; render(); }));
 }
 
-/* ===================== RENDER: UP NEXT ===================== */
-function renderUpNext(){
-  const el = document.getElementById('upnext-section');
-  const upcoming = state.matches
-    .filter(m=>m.status==='upcoming')
-    .filter(m=>{ const ev=eventById(m.eventId); return ev && ev.status==='ready'; })
-    .slice(0,20);
-  if (!upcoming.length){ el.innerHTML=''; return; }
-  const cards = upcoming.slice(0,8).map(m=>{
-    const ev = eventById(m.eventId);
-    return `<div class="upnext-card">
-      <div class="upnext-time">${m.time || ''}</div>
-      <div class="upnext-sport">${ev?ev.sport:''} · ${m.venue||''}</div>
-      <div class="upnext-players">${matchDisplayName(m,'A')}<br><span style="color:var(--muted-dim);font-size:10.5px;">vs</span> ${matchDisplayName(m,'B')}</div>
-    </div>`;
-  }).join('');
-  el.innerHTML = `<div class="section-title">Up Next<div class="rule"></div></div><div class="upnext-scroll">${cards}</div>`;
-}
-
 /* ===================== RENDER: MATCH ROW ===================== */
 function renderMatchRow(m){
   const a = resolveSlot(m,'A'), b = resolveSlot(m,'B');
@@ -1163,7 +1130,6 @@ function render(){
   } else {
     document.getElementById('search-results').style.display='none';
     document.getElementById('home-content').style.display='block';
-    renderUpNext();
     renderEventsList();
   }
 }
