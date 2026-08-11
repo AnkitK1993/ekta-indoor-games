@@ -39,7 +39,7 @@ names, and import/export the whole dataset as JSON.
 | Carrom Doubles | ready | 17 pairs (1 possible name ambiguity: Vinod Agrawal/Shalu Agarwal both partnered with a "Vrinda Agrawal" — never confirmed as 2 people or 1). Aug 16. |
 | Pool | ready | 28 players, progressive pair-down, Aug 15. |
 | Chess | ready but stale | Currently loaded from an **older, messier 26-player sheet** (had since-removed junk entries like "Amaira Chandak (5)", duplicate Harkishin malkan, and "Kiaan sonik" — Kiaan was walked-over/removed). A **clean 22-player roster** was re-verified from the Chess column directly (listed below) but the bracket has NOT been rebuilt from it yet — user put Chess "on hold" pending an age-grouping decision, same as TT Men's/Carrom. |
-| Squash | ready | U15 (7 players, knockout) + Above-15 (9 players, 2 pools → crossover semis → final). Some pool-standings slots (`GA Pool Winner` etc.) are `manual` type — admin must fill in after tallying round-robin results. |
+| Squash | ready | U15 (7 players, knockout) + Under-25 (3 players, round robin → final) + Above-25 (6 players, 2 groups of 3 → crossover semis → final). Some slots (`U25 RR Winner`, `GA Pool Winner`, etc.) are `manual` type — admin must fill in after tallying round-robin/group results. |
 
 ## Open decisions (ask the user, don't assume)
 1. **TT Men's Singles (36 players)** — final grouping. Last suggestion on the table:
