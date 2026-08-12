@@ -52,16 +52,17 @@ Group-winner/runner-up slots (e.g. `1st Group A`, `Pool 2nd`, `Round Robin 3rd`)
 group/pool standings are tallied; they are not auto-computed from match results.
 
 ## Scheduling rules baked into the current SEED_DATA times
-- **Groups/pools ("Americano" stage) run Aug 15, 8:00 AM – 9:00 PM.** Any group/pool
-  match that wouldn't fit in that window rolls to Aug 16 morning instead (Chess, TT
-  Men's Singles, and Pool have some group matches that spill to Aug 16, finishing by
-  11:50 AM) — no match is ever scheduled between 9:00 PM and 8:00 AM.
+- **Aug 15 day shape:** 8:00–9:30 AM (events) → 9:30–10:30 AM (**Flag Hoisting
+  ceremony, no matches**) → 10:30 AM–12:00 PM (events resume) → 12:00–3:00 PM
+  (**break**) → 3:00–10:00 PM (events continue). This is the group/pool ("Americano")
+  stage for all 7 non-doubles events.
+- **Aug 16 day shape:** 8:00 AM start → 12:00–3:00 PM (**break**) → continues until
+  done. Any group/pool matches that didn't fit on Aug 15 (Chess, TT Men's Singles,
+  Pool all currently spill some group matches here) finish by ~3:20 PM, since they
+  also have to clear the Aug 16 midday break.
 - **Semis, finals, and both entire Doubles events (TT Doubles, Carrom Doubles) run only
-  after every group/pool match, in every event, has finished** — starting 11:50 AM
-  Aug 16.
-- **Aug 16, 12:00 – 3:00 PM is a hard break** — no match of any kind is scheduled in
-  that window; anything that would otherwise land there rolls to 3:00 PM. Tournament
-  now finishes **Aug 16, 5:00 PM**.
+  after every group/pool match, in every event, has finished** — currently starting
+  ~3:20 PM Aug 16. Tournament now finishes **Aug 16, 5:35 PM**.
 - **10-minute break rule:** whenever the schedule would otherwise put the same player
   back-to-back with zero gap in the same event, or in an unbroken run across different
   events reaching 60+ minutes of continuous play, a 10-minute gap is inserted before
