@@ -60,9 +60,13 @@ group/pool standings are tallied; they are not auto-computed from match results.
   done. Any group/pool matches that didn't fit on Aug 15 (Chess, TT Men's Singles,
   Pool all currently spill some group matches here) finish by ~3:20 PM, since they
   also have to clear the Aug 16 midday break.
-- **Semis, finals, and both entire Doubles events (TT Doubles, Carrom Doubles) run only
-  after every group/pool match, in every event, has finished** — currently starting
-  ~3:20 PM Aug 16. Tournament now finishes **Aug 16, 5:35 PM**.
+- **Semis and finals run only after every group/pool match, in every event, has
+  finished** — currently starting ~3:20 PM Aug 16.
+- **Both entire Doubles events (TT Doubles, Carrom Doubles) do NOT wait for other
+  events' group stages** — they only need their own players free, starting no earlier
+  than 9:00 AM Aug 16. Currently Carrom Doubles runs 9:00–10:30 AM and TT Doubles
+  9:45–11:15 AM, both wrapped up well before the group stage (and semis/finals) even
+  finish. Tournament now finishes **Aug 16, 5:26 PM**.
 - **10-minute break rule:** whenever the schedule would otherwise put the same player
   back-to-back with zero gap in the same event, or in an unbroken run across different
   events reaching 60+ minutes of continuous play, a 10-minute gap is inserted before
