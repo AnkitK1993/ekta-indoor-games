@@ -183,14 +183,29 @@ group/pool standings are tallied; they are not auto-computed from match results.
   list; typing filters it live; clicking a suggestion fills the field. A **"Show all
   players →"** row (`#edit-name-show-more`, `.search-option-more`) at the bottom of the
   scoped list expands the pool to every player in the whole tournament
-  (`allTournamentPlayers()`) if the one being looked for isn't in the narrow scope — once
-  expanded there's no way back to the narrow list within that modal open (reopening the
-  modal resets it). Free text is still fully allowed too (e.g. for a walkover substitute
-  not in the pool anywhere) — this is a suggestion aid, not a hard constraint.
-  `.modal-actions` has `position:relative; z-index:20` specifically so its buttons stay
-  clickable even when this (or any future) dropdown visually extends over them — don't
-  remove that z-index without re-testing this interaction, a dropdown item sitting on top
-  of an unraised button silently eats the click meant for the button.
+  (`allTournamentPlayers()`, still searchable) if the one being looked for isn't in the
+  narrow scope, **without closing the dropdown** (by user request — see the `mousedown`
+  note below); once expanded there's no way back to the narrow list within that modal open
+  (reopening the modal resets it). Free text is still fully allowed too (e.g. for a
+  walkover substitute not in the pool anywhere) — this is a suggestion aid, not a hard
+  constraint.
+  - **`#edit-name-dropdown { position: static }`** overrides `.search-dropdown`'s default
+    `position: absolute` for this one instance only (ID beats class) — unlike the header
+    search dropdown, which must float over the page content below it, this one lives right
+    above the modal's Cancel/Save buttons with very little room, so it flows in-document
+    and *pushes those buttons down* instead of floating over them (`.modal` got
+    `max-height: calc(100vh - 40px); overflow-y: auto` to scroll as a whole if that ever
+    makes it taller than the viewport). An absolute-overlay version was tried first and
+    rejected: capping the dropdown's height to whatever gap happened to exist above the
+    buttons sometimes left zero room and made it invisible, and z-index games between the
+    dropdown and the buttons just moved which one lost clicks in the overlap zone — don't
+    reintroduce that without solving the not-enough-room case first.
+  - **`edit-name-dropdown`'s own `mousedown` handler calls `preventDefault()`** so clicking
+    anything inside it (a suggestion, "Show more") never blurs `#edit-name-input` in the
+    first place — the input's separate `blur` handler (150ms deferred) is what closes the
+    dropdown on a genuine click-away, and without the `mousedown` guard that same handler
+    was firing for in-dropdown clicks too, closing "Show more"'s expanded list right back
+    up a moment after it opened.
 - **"🗑 Delete" button** on every match (`deleteMatchWithConfirm`) — admin-only, gated behind
   a custom in-app confirm modal (`#delete-match-modal`, styled like every other modal —
   **not** a native `confirm()`, that was deliberately replaced by user request), then

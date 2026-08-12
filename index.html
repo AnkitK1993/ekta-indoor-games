@@ -282,7 +282,7 @@
         border: 1px solid var(--border);
         border-radius: 18px;
         box-shadow: 0 24px 60px rgba(0, 0, 0, 0.2);
-        overflow: hidden;
+        overflow-y: auto;
         max-height: 320px;
         z-index: 10;
       }
@@ -325,6 +325,17 @@
         color: var(--info);
         font-weight: 700;
         border-top: 1px solid var(--border);
+      }
+      /* Unlike the header search's dropdown (which must float over the page
+         content below it), this one lives inside a small modal with the
+         Cancel/Save buttons right underneath — floating over them would mean
+         either the dropdown or the buttons always wins the click depending
+         on z-index, with no good answer. Flowing in-document instead pushes
+         those buttons down as needed; the modal itself scrolls if that ever
+         makes it taller than the viewport (see .modal's max-height/overflow). */
+      #edit-name-dropdown {
+        position: static;
+        margin-top: 8px;
       }
 
       /* ===== Progress ===== */
@@ -1013,6 +1024,8 @@
         padding: 24px;
         width: 100%;
         max-width: 380px;
+        max-height: calc(100vh - 40px);
+        overflow-y: auto;
         box-shadow: var(--shadow);
       }
       .modal h2 {
@@ -9258,10 +9271,18 @@
         .getElementById("edit-name-input")
         .addEventListener("focus", () => renderEditNameDropdown(true));
       document.getElementById("edit-name-input").addEventListener("blur", () => {
-        // deferred so a suggestion button's own click still fires first if
-        // that's what caused this blur (mousedown on it blurs the input)
         setTimeout(hideEditNameDropdown, 150);
       });
+      // Clicking anything inside the dropdown (a suggestion, "Show all
+      // players") would otherwise steal focus from the input and trigger
+      // the blur handler above, closing the dropdown out from under the
+      // click — including "Show more", which should stay open so the admin
+      // can keep searching. Blocking the mousedown's default focus-shift
+      // keeps focus on the input the whole time, so blur never fires for
+      // clicks inside the dropdown, only for genuinely clicking away.
+      document
+        .getElementById("edit-name-dropdown")
+        .addEventListener("mousedown", (e) => e.preventDefault());
       document.addEventListener("click", (e) => {
         if (!e.target.closest("#edit-modal .field")) hideEditNameDropdown();
       });
