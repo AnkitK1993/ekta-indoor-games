@@ -57,18 +57,26 @@ group/pool standings are tallied; they are not auto-computed from match results.
   Men's Singles, and Pool have some group matches that spill to Aug 16, finishing by
   11:50 AM) — no match is ever scheduled between 9:00 PM and 8:00 AM.
 - **Semis, finals, and both entire Doubles events (TT Doubles, Carrom Doubles) run only
-  after every group/pool match, in every event, has finished** — currently starting
-  11:50 AM Aug 16. Tournament finishes **Aug 16, 2:05 PM**.
+  after every group/pool match, in every event, has finished** — starting 11:50 AM
+  Aug 16.
+- **Aug 16, 12:00 – 3:00 PM is a hard break** — no match of any kind is scheduled in
+  that window; anything that would otherwise land there rolls to 3:00 PM. Tournament
+  now finishes **Aug 16, 5:00 PM**.
 - **10-minute break rule:** whenever the schedule would otherwise put the same player
   back-to-back with zero gap in the same event, or in an unbroken run across different
   events reaching 60+ minutes of continuous play, a 10-minute gap is inserted before
   that match. This only applies to matches with a known (`type:"fixed"`) player on
   both/either side — later-round `placeholder`/`manual` slots can't be checked since
   the actual player isn't known yet.
-- If any of these rules change (break length, day-15 cutoff, or whether semis/finals
-  must wait for every event's groups vs. just their own), the whole schedule needs to
-  be regenerated — don't hand-edit individual match times, as they're
-  interdependent across events via shared players and shared venues.
+- If any of these rules change (break length/timing, day-15 cutoff, or whether
+  semis/finals must wait for every event's groups vs. just their own), the whole
+  schedule needs to be regenerated — don't hand-edit individual match times, as
+  they're interdependent across events via shared players and shared venues.
+- **Live app note:** the deployed app reads from Firestore, not directly from this
+  repo's `index.html`. After changing SEED_DATA here, the admin must re-sync
+  Firestore (⇅ import/export → Import → Override) for the live app to reflect it —
+  the plain "Load Data" seed button only sets/overwrites by ID, it doesn't delete
+  stale docs from a previous schedule version.
 
 ## UI conventions already built (keep consistent with these if adding features)
 - Dark theme default (`#0B0E14` bg), light theme toggle, Teko/Inter/IBM Plex Mono fonts,
