@@ -37,19 +37,38 @@ All 9 events are `"ready"` with full brackets built (308 matches total).
 
 | Event | Players/Pairs | Structure | Day |
 |---|---|---|---|
-| TT — Women's Singles | 8 | 2 groups (A: 31–38, B: 40–58) → round robin → semis → final | Aug 15 |
-| TT — Doubles | 8 pairs | Knockout, random draw | Aug 15–16 |
+| TT — Women's Singles | 8 | 2 groups (A: 31–38, B: 40–58) → round robin → semis → final | Aug 15–16 |
+| TT — Doubles | 8 pairs | Knockout, random draw | Aug 16 (entire event) |
 | TT — Men's Singles | 36 | 5 age bands (Under 15 / Under 32 / Under 36 / Under 46 / Senior): groups → semis → final | Aug 15–16 |
 | Carrom — Men's Singles | 23 | 3 age bands (Under 15 / Under 46 / Above 46): groups → semis → final | Aug 15–16 |
-| Carrom — Women's Singles | 5 | Round robin → final | Aug 15 |
-| Carrom — Doubles (Mixed) | 15 pairs | Knockout, 1 bye | Aug 15–16 |
+| Carrom — Women's Singles | 5 | Round robin → final | Aug 15–16 |
+| Carrom — Doubles (Mixed) | 15 pairs | Knockout, 1 bye | Aug 16 (entire event) |
 | Pool | 28 | 3 age bands (Under 26 / 26–39 / 40+): groups → semis → final | Aug 15–16 |
-| Chess | 22 | 4 age bands (Under 11 / 12–20 / 21–40 / 41+): pool → final (41+ also gets semis) | Aug 15 |
-| Squash | 16 | U15 knockout + 15–25 Bracket (pool → final) + Above 25 Bracket (2 pools → semis → final) | Aug 15 |
+| Chess | 22 | 4 age bands (Under 11 / 12–20 / 21–40 / 41+): pool → final (41+ also gets semis) | Aug 15–16 |
+| Squash | 16 | U15 knockout + 15–25 Bracket (pool → final) + Above 25 Bracket (2 pools → semis → final) | Aug 15–16 |
 
 Group-winner/runner-up slots (e.g. `1st Group A`, `Pool 2nd`, `Round Robin 3rd`) are
 `manual` type across every age-banded event — admin fills them in via "✎ edit" once
 group/pool standings are tallied; they are not auto-computed from match results.
+
+## Scheduling rules baked into the current SEED_DATA times
+- **Groups/pools ("Americano" stage) run Aug 15, 8:00 AM – 9:00 PM.** Any group/pool
+  match that wouldn't fit in that window rolls to Aug 16 morning instead (Chess, TT
+  Men's Singles, and Pool have some group matches that spill to Aug 16, finishing by
+  11:50 AM) — no match is ever scheduled between 9:00 PM and 8:00 AM.
+- **Semis, finals, and both entire Doubles events (TT Doubles, Carrom Doubles) run only
+  after every group/pool match, in every event, has finished** — currently starting
+  11:50 AM Aug 16. Tournament finishes **Aug 16, 2:05 PM**.
+- **10-minute break rule:** whenever the schedule would otherwise put the same player
+  back-to-back with zero gap in the same event, or in an unbroken run across different
+  events reaching 60+ minutes of continuous play, a 10-minute gap is inserted before
+  that match. This only applies to matches with a known (`type:"fixed"`) player on
+  both/either side — later-round `placeholder`/`manual` slots can't be checked since
+  the actual player isn't known yet.
+- If any of these rules change (break length, day-15 cutoff, or whether semis/finals
+  must wait for every event's groups vs. just their own), the whole schedule needs to
+  be regenerated — don't hand-edit individual match times, as they're
+  interdependent across events via shared players and shared venues.
 
 ## UI conventions already built (keep consistent with these if adding features)
 - Dark theme default (`#0B0E14` bg), light theme toggle, Teko/Inter/IBM Plex Mono fonts,
