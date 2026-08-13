@@ -92,17 +92,16 @@ group/pool standings are tallied; they are not auto-computed from match results.
   (**break**) → 3:00–10:00 PM (events continue). This is the group/pool ("Americano")
   stage for all 7 non-doubles events.
 - **Aug 16 day shape:** 8:00 AM start → 12:00–3:00 PM (**break**) → continues until
-  done. Any group/pool matches that didn't fit on Aug 15 (TT Men's Singles
-  currently spills some group matches here) wrap up by late morning, since they
-  also have to clear the Aug 16 midday break.
+  done. Any group/pool matches that didn't fit on Aug 15 wrap up by late morning,
+  since they also have to clear the Aug 16 midday break. Only Squash still spills a
+  meaningful chunk of its own group stage into Aug 16 morning now.
 - **No single tournament-wide gate on semis/finals.** Each event/band becomes
   schedulable the moment its own prerequisites (own group/pool stage, or own prior
   knockout round) are met and a table/board is free — a proper dependency-based
-  reflow (see below), not a fixed "everyone waits for everyone" cutoff. Most events'
-  semis/finals now land on Aug 15 once their own group stage clears (TT Women's,
-  Chess, Carrom Men's, Carrom Women's, Pool all finish entirely on Aug 15 or by
-  Aug 16 morning); only TT Men's Singles and Squash's Above 25 Bracket still clear
-  their own group stage on Aug 16 and run semis/finals later that day.
+  reflow (see below), not a fixed "everyone waits for everyone" cutoff. Every TT
+  band's group/pool stage now clears entirely on Aug 15, same as TT Women's,
+  Chess, Carrom Men's, Carrom Women's, and Pool — only Squash's Above 25 Bracket
+  still clears its own group stage on Aug 16 and runs semis/finals later that day.
 - **Both entire Doubles events (TT Doubles, Carrom Doubles) do NOT wait for other
   events' group stages** — they only need their own players free, starting no earlier
   than 9:00 AM Aug 16.
@@ -125,12 +124,19 @@ group/pool standings are tallied; they are not auto-computed from match results.
   (and the rest of TT — TT Women's, TT Men's other 4 bands, TT Doubles) was fully
   reflowed with true per-band/per-bracket dependency scheduling. **Above 46 is
   explicitly prioritized to lead off the very first TT slot of the day** (Match 1,
-  Table 1, Aug 15 8:00 AM) whenever it ties with another band for the earliest
+  Table 2, Aug 15 8:00 AM) whenever it ties with another band for the earliest
   achievable start and doing so causes no player/venue conflict — none of its
   9 players have any other-event commitment before Aug 15 evening, so this was free to
-  do. This reclaimed table time lets TT Women's Singles finish by **Aug 15, 11:15 AM**
-  and TT Men's Singles (all 5 bands, including the Above 46 knockout) by **Aug 16,
-  4:00 PM** — both well ahead of their pre-reflow finish times.
+  do.
+- **TT's first reflow pass (finishing Aug 16, 4:30 PM) still had the single-cursor
+  bug described below** — it predated the fix discovered during Chess's reflow, so
+  it was silently carrying the same inflated idle time. Re-run with the corrected
+  per-player interval model once the bug was found: TT Women's Singles now finishes
+  by **Aug 15, 12:00 PM**, TT Men's Singles (all 5 bands, including the Above 46
+  knockout — its own group stage now clears entirely on Aug 15, only the Under 46
+  Final spills to 8:00–8:15 AM Aug 16) by **Aug 16, 8:15 AM**, and TT Doubles by
+  **Aug 16, 10:15 AM** — all three collapsed from running well into Aug 16
+  afternoon down to essentially wrapping by the next morning.
 - **Carrom (Men's/Women's/Doubles together, since their 3 boards are shared) and
   Pool were also reflowed** the same way, after the same idle-board analysis that
   caught Chess. Carrom Men's Singles now finishes entirely on **Aug 15, 5:45 PM**
@@ -141,23 +147,25 @@ group/pool standings are tallied; they are not auto-computed from match results.
   while Carrom Men's reclaimed the freed board time — ties in the greedy
   list-scheduler are explicitly broken in Carrom Women's favor for this reason,
   same pattern as Above 46 leading off TT.
-- **Tournament now finishes Aug 16, 4:30 PM** (TT Doubles is now the last event to
-  finish, since it shares tables with TT Men's Singles and only starts once its own
-  players are free from 9:00 AM Aug 16 onward) — unchanged by the Carrom/Pool
-  reflow since TT Doubles was already the long pole, but every other event now
-  wraps up dramatically earlier.
+- **Tournament now finishes Aug 16, 4:14 PM** (Squash is now the last event to
+  finish — the only sport not yet reflowed with the corrected model; every
+  reflowed event, including TT after its second pass, now wraps up well before
+  that).
 - **Reflow script caveats (if reflowing Squash, the one sport left unreflowed):**
   (1) the player-conflict model must track each player's *full list* of busy
   intervals for the day, not a single "last known match end" cursor — collapsing
   a player's day to one cursor makes the scheduler think they're busy continuously
   from their first match to their very last one, hiding every real gap in between.
   This bug produced a badly-inflated Chess schedule (finishing 9:20 PM instead of
-  8:20 AM) before being caught and fixed. (2) Even with per-player intervals, the
-  streak/break check must look **both directions** from a candidate slot, not just
-  backward — a new match can end up sandwiched with zero gap between two
-  *already-fixed* matches from other events, silently forming a 60+ minute
-  streak that a backward-only check can't see. This second bug slipped through
-  Chess and Carrom (didn't happen to trigger) but broke one player's schedule
+  8:20 AM) before being caught and fixed, and was later found to have silently
+  affected TT's first reflow pass too (see above) — always confirm which model a
+  reflow script is using before trusting its output, especially if reusing an
+  older script as a template. (2) Even with per-player intervals, the streak/break
+  check must look **both directions** from a candidate slot, not just backward —
+  a new match can end up sandwiched with zero gap between two *already-fixed*
+  matches from other events, silently forming a 60+ minute streak that a
+  backward-only check can't see. This second bug slipped through Chess, Carrom,
+  and TT's second pass (didn't happen to trigger) but broke one player's schedule
   during the Pool reflow before being caught and fixed.
 - **10-minute break rule:** whenever the schedule would otherwise put the same player
   back-to-back with zero gap in the same event, or in an unbroken run across different
