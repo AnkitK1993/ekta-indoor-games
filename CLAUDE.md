@@ -130,10 +130,16 @@ group/pool standings are tallied; they are not auto-computed from match results.
 - **TT's first reflow pass (finishing Aug 16, 4:30 PM) still had the single-cursor
   bug described below** — it predated the fix discovered during Chess's reflow, so
   it was silently carrying the same inflated idle time. Re-run with the corrected
-  per-player interval model once the bug was found: TT Women's Singles now finishes
-  by **Aug 15, 12:00 PM**; TT Men's Singles' groups/semis and TT Doubles' quarters/
-  semis all clear well inside Aug 15 / early Aug 16 morning too — both collapsed
-  from running well into Aug 16 afternoon.
+  per-player interval model once the bug was found: TT Men's Singles' groups/
+  semis and TT Doubles' quarters/semis all clear well inside Aug 15 / early
+  Aug 16 morning, collapsed from running well into Aug 16 afternoon.
+- **TT Women's Singles is deliberately held back** (by user request): its
+  group stage doesn't start until **Aug 15, 10:30 AM** (not 8:00 AM), and its
+  semifinal + final are further held to **3:00–3:30 PM** rather than running
+  right after the group stage finishes late morning — a `TT_WOMEN_START` /
+  `TT_WOMEN_SF_FINAL_FLOOR` pair on top of the normal dependency floor,
+  same pattern as `FINALS_FLOOR`. This deliberately frees up both TT tables
+  all morning for TT Men's Singles and reclaims capacity elsewhere in TT.
 - **All 6 TT Men's/Doubles finals are deliberately held to Aug 16, 11:00 AM
   onward** (by user request), rather than being scheduled as soon as each
   semifinal happens to finish — a `FINALS_FLOOR` on top of the normal
