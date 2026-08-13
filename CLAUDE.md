@@ -132,11 +132,18 @@ group/pool standings are tallied; they are not auto-computed from match results.
   bug described below** — it predated the fix discovered during Chess's reflow, so
   it was silently carrying the same inflated idle time. Re-run with the corrected
   per-player interval model once the bug was found: TT Women's Singles now finishes
-  by **Aug 15, 12:00 PM**, TT Men's Singles (all 5 bands, including the Above 46
-  knockout — its own group stage now clears entirely on Aug 15, only the Under 46
-  Final spills to 8:00–8:15 AM Aug 16) by **Aug 16, 8:15 AM**, and TT Doubles by
-  **Aug 16, 10:15 AM** — all three collapsed from running well into Aug 16
-  afternoon down to essentially wrapping by the next morning.
+  by **Aug 15, 12:00 PM**; TT Men's Singles' groups/semis and TT Doubles' quarters/
+  semis all clear well inside Aug 15 / early Aug 16 morning too — both collapsed
+  from running well into Aug 16 afternoon.
+- **All 6 TT Men's/Doubles finals are deliberately held to Aug 16, 11:00 AM
+  onward** (by user request), rather than being scheduled as soon as each
+  semifinal happens to finish — a `FINALS_FLOOR` on top of the normal
+  dependency floor for any `tt_men` match whose round ends in `" - Final"` or
+  the `tt_doubles` `"Final"` match. They land together, **Aug 16, 11:00–11:45
+  AM**, as one finals session (Above 46 and Under 36 finals at 11:00, Under 15/
+  Under 26 at 11:15, Under 46 and TT Doubles at 11:30–11:45) instead of
+  trickling out individually. This only delays those 6 matches — everything
+  else in TT keeps its earliest achievable time.
 - **Carrom (Men's/Women's/Doubles together, since their 3 boards are shared) and
   Pool were also reflowed** the same way, after the same idle-board analysis that
   caught Chess. Carrom Men's Singles now finishes entirely on **Aug 15, 5:45 PM**
