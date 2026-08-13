@@ -63,13 +63,13 @@ names, and import/export the whole dataset as JSON.
   individual, consistent with how search already treats names.
 
 ## Status of each event
-All 9 events are `"ready"` with full brackets built (308 matches total).
+All 9 events are `"ready"` with full brackets built (297 matches total).
 
 | Event (display `name`) | Players/Pairs | Structure | Day |
 |---|---|---|---|
 | TT - Women's | 8 | 2 groups (A: 31–38, B: 40–58) → round robin → semis → final | Aug 15–16 |
 | TT - Doubles | 8 pairs | Knockout, random draw | Aug 16 (entire event) |
-| TT - Men's | 36 | 5 age bands (Under 15 / Under 26 / Under 36 / Under 46 / Above 46): groups → semis → final | Aug 15–16 |
+| TT - Men's | 36 | 4 age bands (Under 15 / Under 26 / Under 36 / Under 46): groups → semis → final; Above 46 (9 players) is a single-elimination knockout (Sanjay Kumar gets a bye straight to the Quarterfinal) | Aug 15–16 |
 | Carrom - Men's | 23 | 3 age bands (Under 15 / Under 46 / Above 46): groups → semis → final | Aug 15–16 |
 | Carrom - Women's | 5 | Round robin → final | Aug 15–16 |
 | Carrom - Doubles | 15 pairs (mixed) | Knockout, 1 bye | Aug 16 (entire event) |
@@ -99,10 +99,18 @@ group/pool standings are tallied; they are not auto-computed from match results.
   finished** — currently starting ~3:20 PM Aug 16.
 - **Both entire Doubles events (TT Doubles, Carrom Doubles) do NOT wait for other
   events' group stages** — they only need their own players free, starting no earlier
-  than 9:00 AM Aug 16. Currently Carrom Doubles runs 9:00–10:30 AM and TT Doubles
-  9:45–11:15 AM, both wrapped up well before the group stage (and semis/finals) even
-  finish. Tournament now finishes **Aug 16, 6:14 PM** (TT - Men's Singles is the
-  last event to finish, gated by its Above 46 band's semis/final).
+  than 9:00 AM Aug 16.
+- **TT Men's Singles' Above 46 band is a knockout, not a gated group stage** — since it
+  no longer needs a full group/pool stage to finish before its bracket can start, it
+  (and the rest of TT — TT Women's, TT Men's other 4 bands, TT Doubles) was fully
+  reflowed with true per-band/per-bracket dependency scheduling: each TT band becomes
+  schedulable the moment its own prerequisites (own group stage, or own prior knockout
+  round) are met and a table is free, rather than waiting for a single shared TT-wide
+  gate. This reclaimed table time lets TT Women's Singles finish by **Aug 15, 11:00 AM**
+  and TT Men's Singles (all 5 bands, including the Above 46 knockout) by **Aug 16,
+  4:45 PM** — both well ahead of their previous finish times. Tournament now finishes
+  **Aug 16, 5:00 PM** (Chess is now the last event to finish, gated by its own pool
+  stage running long).
 - **10-minute break rule:** whenever the schedule would otherwise put the same player
   back-to-back with zero gap in the same event, or in an unbroken run across different
   events reaching 60+ minutes of continuous play, a 10-minute gap is inserted before
