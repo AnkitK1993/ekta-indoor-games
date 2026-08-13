@@ -106,9 +106,13 @@ group/pool standings are tallied; they are not auto-computed from match results.
   reflowed with true per-band/per-bracket dependency scheduling: each TT band becomes
   schedulable the moment its own prerequisites (own group stage, or own prior knockout
   round) are met and a table is free, rather than waiting for a single shared TT-wide
-  gate. This reclaimed table time lets TT Women's Singles finish by **Aug 15, 11:00 AM**
+  gate. **Above 46 is explicitly prioritized to lead off the very first TT slot of the
+  day** (Match 1, Table 1, Aug 15 8:00 AM) whenever it ties with another band for the
+  earliest achievable start and doing so causes no player/venue conflict — none of its
+  9 players have any other-event commitment before Aug 15 evening, so this was free to
+  do. This reclaimed table time lets TT Women's Singles finish by **Aug 15, 11:15 AM**
   and TT Men's Singles (all 5 bands, including the Above 46 knockout) by **Aug 16,
-  4:45 PM** — both well ahead of their previous finish times. Tournament now finishes
+  4:00 PM** — both well ahead of their pre-reflow finish times. Tournament now finishes
   **Aug 16, 5:00 PM** (Chess is now the last event to finish, gated by its own pool
   stage running long).
 - **10-minute break rule:** whenever the schedule would otherwise put the same player
