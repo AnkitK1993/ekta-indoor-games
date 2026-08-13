@@ -92,16 +92,15 @@ group/pool standings are tallied; they are not auto-computed from match results.
   (**break**) → 3:00–10:00 PM (events continue). This is the group/pool ("Americano")
   stage for all 7 non-doubles events.
 - **Aug 16 day shape:** 8:00 AM start → 12:00–3:00 PM (**break**) → continues until
-  done. Any group/pool matches that didn't fit on Aug 15 wrap up by late morning,
-  since they also have to clear the Aug 16 midday break. Only Squash still spills a
-  meaningful chunk of its own group stage into Aug 16 morning now.
+  done. Every event's own group/pool stage now clears by Aug 15 evening — Aug 16
+  is only the TT Men's/Doubles finals (11:00–11:45 AM) and the 3 Squash finals
+  (3:00–3:54 PM), both deliberately held to fixed times rather than a real
+  group-stage spillover.
 - **No single tournament-wide gate on semis/finals.** Each event/band becomes
   schedulable the moment its own prerequisites (own group/pool stage, or own prior
   knockout round) are met and a table/board is free — a proper dependency-based
-  reflow (see below), not a fixed "everyone waits for everyone" cutoff. Every TT
-  band's group/pool stage now clears entirely on Aug 15, same as TT Women's,
-  Chess, Carrom Men's, Carrom Women's, and Pool — only Squash's Above 25 Bracket
-  still clears its own group stage on Aug 16 and runs semis/finals later that day.
+  reflow (see below), not a fixed "everyone waits for everyone" cutoff. Every
+  band's group/pool stage across every event now clears entirely on Aug 15.
 - **Both entire Doubles events (TT Doubles, Carrom Doubles) do NOT wait for other
   events' group stages** — they only need their own players free, starting no earlier
   than 9:00 AM Aug 16.
@@ -154,14 +153,20 @@ group/pool standings are tallied; they are not auto-computed from match results.
   while Carrom Men's reclaimed the freed board time — ties in the greedy
   list-scheduler are explicitly broken in Carrom Women's favor for this reason,
   same pattern as Above 46 leading off TT.
-- **Tournament now finishes Aug 16, 4:14 PM** (Squash is now the last event to
-  finish — the only sport not yet reflowed with the corrected model; every
-  reflowed event, including TT after its second pass, now wraps up well before
-  that).
-- **Reflow script caveats (if reflowing Squash, the one sport left unreflowed):**
-  (1) the player-conflict model must track each player's *full list* of busy
-  intervals for the day, not a single "last known match end" cursor — collapsing
-  a player's day to one cursor makes the scheduler think they're busy continuously
+- **Squash was reflowed too** (all 9 events have now been through the corrected
+  dependency-based scheduler — none left on the original static generator), with
+  its 3 finals (Under 15, 15-25 Bracket, Above 25 Bracket) **deliberately held to
+  Aug 16, 3:00 PM onward** (by user request), the same `FINALS_FLOOR` pattern
+  used for TT's finals. Since Squash has only 1 court, the 3 finals run
+  strictly back-to-back: **3:00, 3:18, 3:36 PM** (18 min each). Every group/pool
+  match and semifinal clears by Aug 15 evening — only the 3 finals sit on Aug 16.
+- **Tournament now finishes Aug 16, 3:54 PM** (Squash's Above 25 Bracket Final,
+  the last of its 3 finals, is now the tournament's final match — every other
+  event finishes well before that).
+- **Reflow script caveats (if any event needs reflowing again):** (1) the
+  player-conflict model must track each player's *full list* of busy intervals
+  for the day, not a single "last known match end" cursor — collapsing a
+  player's day to one cursor makes the scheduler think they're busy continuously
   from their first match to their very last one, hiding every real gap in between.
   This bug produced a badly-inflated Chess schedule (finishing 9:20 PM instead of
   8:20 AM) before being caught and fixed, and was later found to have silently
@@ -173,7 +178,11 @@ group/pool standings are tallied; they are not auto-computed from match results.
   matches from other events, silently forming a 60+ minute streak that a
   backward-only check can't see. This second bug slipped through Chess, Carrom,
   and TT's second pass (didn't happen to trigger) but broke one player's schedule
-  during the Pool reflow before being caught and fixed.
+  during the Pool reflow before being caught and fixed. (3) A `FINALS_FLOOR`
+  (or any other fixed-time hold) only needs to override `base_floor` for the
+  matches it targets — the dependency-driven floor from `deps_of` still applies
+  on top via `max()`, so a final can never be scheduled before its own
+  semifinal even if the floor time has already passed.
 - **10-minute break rule:** whenever the schedule would otherwise put the same player
   back-to-back with zero gap in the same event, or in an unbroken run across different
   events reaching 60+ minutes of continuous play, a 10-minute gap is inserted before
