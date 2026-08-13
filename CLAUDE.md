@@ -35,6 +35,20 @@ names, and import/export the whole dataset as JSON.
   edited this" conflict warnings without asking — all three were explicitly
   decided against. The `#offline-banner` (shown to everyone, not just admins)
   toggles on the browser's native `online`/`offline` events.
+- **Backgrounded-tab read staleness fix:** mobile browsers can suspend a
+  tab's WebSocket while the phone is locked or the tab isn't focused, so a
+  Firestore `onSnapshot` update that lands while a viewer's phone is
+  backgrounded may not render until something reconnects the listener —
+  reported as "the other person's phone only picked up the *next*
+  Start Match after I toggled a match off and back on," which happened to
+  coincide with them checking their phone again. Fixed with `refreshOnVisible()`
+  (a one-shot `getDocs()` re-fetch of `events`/`matches`/`playerPayments`,
+  wired to both `visibilitychange` and `pageshow`) that force-syncs `state`
+  whenever a tab comes back to the foreground, independent of whatever state
+  the realtime listener's connection is in. It updates `state.knownStatuses`
+  silently (no completed-match toast for a transition that happened while
+  backgrounded) since that toast is for catching a *live* transition, not
+  catching up after the fact.
 
 ## Data model (see SEED_DATA constant embedded in the HTML file)
 - `events`: `{id, name, sport, category, gender, day, format, equipment, status}`.

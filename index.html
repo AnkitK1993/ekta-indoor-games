@@ -8454,6 +8454,55 @@
       }
       startListeners();
 
+      // Mobile browsers can suspend a backgrounded tab's WebSocket, so a
+      // Firestore onSnapshot update that happens while the phone is locked
+      // or the tab isn't focused may not render until something nudges the
+      // listener back to life. Force a one-shot refetch whenever the tab
+      // becomes visible again so state never lingers stale after a resume.
+      let visibilityRefreshInFlight = false;
+      async function refreshOnVisible() {
+        if (document.visibilityState !== "visible") return;
+        if (visibilityRefreshInFlight) return;
+        visibilityRefreshInFlight = true;
+        try {
+          const [evSnap, mSnap, pSnap] = await Promise.all([
+            getDocs(collection(db, "events")),
+            getDocs(collection(db, "matches")),
+            getDocs(collection(db, "playerPayments")),
+          ]);
+          if (!evSnap.empty) {
+            state.events = normalizeEvents(
+              evSnap.docs.map((d) => ({ id: d.id, ...d.data() })),
+            );
+          }
+          if (!mSnap.empty) {
+            state.matches = mSnap.docs.map((d) => ({ id: d.id, ...d.data() }));
+            state.matchesById = {};
+            state.matches.forEach(
+              (m) => (state.matchesById[m.matchId || m.id] = m),
+            );
+            // sync silently — don't retrigger the "just completed" toast for
+            // a transition that happened while this tab was backgrounded
+            state.matches.forEach(
+              (m) => (state.knownStatuses[m.matchId || m.id] = m.status),
+            );
+          }
+          const map = {};
+          pSnap.docs.forEach((d) => {
+            const data = d.data();
+            map[data.name || d.id] = data;
+          });
+          state.playerPayments = map;
+          render();
+        } catch (e) {
+          console.warn("visibility refresh failed", e);
+        } finally {
+          visibilityRefreshInFlight = false;
+        }
+      }
+      document.addEventListener("visibilitychange", refreshOnVisible);
+      window.addEventListener("pageshow", refreshOnVisible);
+
       /* ===================== ADMIN AUTH ===================== */
       onAuthStateChanged(auth, (user) => {
         state.isAdmin = !!user;
