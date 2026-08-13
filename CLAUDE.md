@@ -69,7 +69,7 @@ All 9 events are `"ready"` with full brackets built (308 matches total).
 |---|---|---|---|
 | TT - Women's | 8 | 2 groups (A: 31–38, B: 40–58) → round robin → semis → final | Aug 15–16 |
 | TT - Doubles | 8 pairs | Knockout, random draw | Aug 16 (entire event) |
-| TT - Men's | 36 | 5 age bands (Under 15 / Under 32 / Under 36 / Under 46 / Senior): groups → semis → final | Aug 15–16 |
+| TT - Men's | 36 | 5 age bands (Under 15 / Under 26 / Under 36 / Under 46 / Above 46): groups → semis → final | Aug 15–16 |
 | Carrom - Men's | 23 | 3 age bands (Under 15 / Under 46 / Above 46): groups → semis → final | Aug 15–16 |
 | Carrom - Women's | 5 | Round robin → final | Aug 15–16 |
 | Carrom - Doubles | 15 pairs (mixed) | Knockout, 1 bye | Aug 16 (entire event) |
@@ -101,7 +101,8 @@ group/pool standings are tallied; they are not auto-computed from match results.
   events' group stages** — they only need their own players free, starting no earlier
   than 9:00 AM Aug 16. Currently Carrom Doubles runs 9:00–10:30 AM and TT Doubles
   9:45–11:15 AM, both wrapped up well before the group stage (and semis/finals) even
-  finish. Tournament now finishes **Aug 16, 5:26 PM**.
+  finish. Tournament now finishes **Aug 16, 6:14 PM** (TT - Men's Singles is the
+  last event to finish, gated by its Above 46 band's semis/final).
 - **10-minute break rule:** whenever the schedule would otherwise put the same player
   back-to-back with zero gap in the same event, or in an unbroken run across different
   events reaching 60+ minutes of continuous play, a 10-minute gap is inserted before
@@ -178,8 +179,8 @@ group/pool standings are tallied; they are not auto-computed from match results.
   from the header search) defaults to every already-known player scoped to the same event
   *and*, where the event has age bands, the same band as the match being edited
   (`eventCategoryPlayers()` + `matchCategoryPrefix()` — the same age-band-prefix logic the
-  standings auto-resolution uses, e.g. tapping edit on a "Senior" match only shows the 6
-  Senior players, not all 36 tt_men players). Clicking into the field shows that scoped
+  standings auto-resolution uses, e.g. tapping edit on an "Under 15" match only shows the 6
+  Under 15 players, not all 36 tt_men players). Clicking into the field shows that scoped
   list; typing filters it live; clicking a suggestion fills the field. A **"Show all
   players →"** row (`#edit-name-show-more`, `.search-option-more`) at the bottom of the
   scoped list expands the pool to every player in the whole tournament
@@ -234,7 +235,7 @@ group/pool standings are tallied; they are not auto-computed from match results.
   code, or any round ending in `" - Final"` (age-band events). Most events have exactly one
   final (`finalBracketLabel()` returns `null`, no label shown); the 5 age-banded events
   (TT - Men's: 5 bands, Carrom - Men's: 3, Pool: 3, Chess: 4, Squash: 3 brackets) have
-  several, each labeled with its band/bracket name (e.g. "Under 32", "15-25 Bracket").
+  several, each labeled with its band/bracket name (e.g. "Under 26", "15-25 Bracket").
   Verified against every match in SEED_DATA: 22 finals total across all 9 events, matching
   the documented bracket counts exactly — don't change the round-naming convention
   (`"<Band> - Final"` / plain `"Final"` / squash's `U15-F`) without updating both
