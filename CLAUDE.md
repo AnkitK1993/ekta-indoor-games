@@ -92,29 +92,54 @@ group/pool standings are tallied; they are not auto-computed from match results.
   (**break**) → 3:00–10:00 PM (events continue). This is the group/pool ("Americano")
   stage for all 7 non-doubles events.
 - **Aug 16 day shape:** 8:00 AM start → 12:00–3:00 PM (**break**) → continues until
-  done. Any group/pool matches that didn't fit on Aug 15 (Chess, TT Men's Singles,
-  Pool all currently spill some group matches here) finish by ~3:20 PM, since they
-  also have to clear the Aug 16 midday break.
-- **Semis and finals run only after every group/pool match, in every event, has
-  finished** — currently starting ~3:20 PM Aug 16.
+  done. Any group/pool matches that didn't fit on Aug 15 (TT Men's Singles, Pool
+  currently spill some group matches here) wrap up by late morning, since they also
+  have to clear the Aug 16 midday break.
+- **No single tournament-wide gate on semis/finals.** Each event/band becomes
+  schedulable the moment its own prerequisites (own group/pool stage, or own prior
+  knockout round) are met and a table/board is free — a proper dependency-based
+  reflow (see below), not a fixed "everyone waits for everyone" cutoff. Some
+  events' semis/finals land on Aug 15 evening once their own group stage clears
+  (TT Women's, Chess); others only clear their own group stage on Aug 16 and so
+  run semis/finals later that day (Carrom Men's, Squash's Above 25 Bracket).
 - **Both entire Doubles events (TT Doubles, Carrom Doubles) do NOT wait for other
   events' group stages** — they only need their own players free, starting no earlier
   than 9:00 AM Aug 16.
+- **TT was fully reflowed** with true per-band/per-bracket dependency scheduling
+  (see "TT Men's Singles' Above 46 band is a knockout" below for why), and **Chess
+  was independently reflowed the same way** after analysis showed its 2 boards were
+  sitting idle for large stretches of open time even though no player conflict
+  required it — a flaw in the original static schedule generator, not a real
+  constraint. Both reflows use a greedy list-scheduler: repeatedly place whichever
+  "ready" match (all its dependencies already placed) has the earliest achievable
+  start across the event's boards/tables, checking every other player's *actual*
+  free gaps that day (not just whether they're "done for the day") for conflicts.
+  Chess's entire pool stage, semifinals, and final now complete by **Aug 16, 8:20
+  AM** (only the 41-and-above Final spills past the Aug 15 10 PM cutoff) — down
+  from 5:00 PM previously, since the old generator left its boards idle during
+  open hours instead of finding players' real gaps between their other-sport
+  matches.
 - **TT Men's Singles' Above 46 band is a knockout, not a gated group stage** — since it
   no longer needs a full group/pool stage to finish before its bracket can start, it
   (and the rest of TT — TT Women's, TT Men's other 4 bands, TT Doubles) was fully
-  reflowed with true per-band/per-bracket dependency scheduling: each TT band becomes
-  schedulable the moment its own prerequisites (own group stage, or own prior knockout
-  round) are met and a table is free, rather than waiting for a single shared TT-wide
-  gate. **Above 46 is explicitly prioritized to lead off the very first TT slot of the
-  day** (Match 1, Table 1, Aug 15 8:00 AM) whenever it ties with another band for the
-  earliest achievable start and doing so causes no player/venue conflict — none of its
+  reflowed with true per-band/per-bracket dependency scheduling. **Above 46 is
+  explicitly prioritized to lead off the very first TT slot of the day** (Match 1,
+  Table 1, Aug 15 8:00 AM) whenever it ties with another band for the earliest
+  achievable start and doing so causes no player/venue conflict — none of its
   9 players have any other-event commitment before Aug 15 evening, so this was free to
   do. This reclaimed table time lets TT Women's Singles finish by **Aug 15, 11:15 AM**
   and TT Men's Singles (all 5 bands, including the Above 46 knockout) by **Aug 16,
-  4:00 PM** — both well ahead of their pre-reflow finish times. Tournament now finishes
-  **Aug 16, 5:00 PM** (Chess is now the last event to finish, gated by its own pool
-  stage running long).
+  4:00 PM** — both well ahead of their pre-reflow finish times.
+- **Tournament now finishes Aug 16, 4:30 PM** (TT Doubles is now the last event to
+  finish, since it shares tables with TT Men's Singles and only starts once its own
+  players are free from 9:00 AM Aug 16 onward).
+- **Reflow script caveat (if reflowing another event):** the player-conflict model
+  must track each player's *full list* of busy intervals for the day, not a single
+  "last known match end" cursor — collapsing a player's day to one cursor makes the
+  scheduler think they're busy continuously from their first match to their very
+  last one, hiding every real gap in between. This bug produced a badly-inflated
+  Chess schedule (finishing 9:20 PM instead of 8:20 AM) before being caught and
+  fixed; watch for it if this reflow approach is reused on Carrom, Pool, or Squash.
 - **10-minute break rule:** whenever the schedule would otherwise put the same player
   back-to-back with zero gap in the same event, or in an unbroken run across different
   events reaching 60+ minutes of continuous play, a 10-minute gap is inserted before
