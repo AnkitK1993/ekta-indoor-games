@@ -774,6 +774,25 @@
         background: linear-gradient(90deg, var(--live-dim), rgba(255, 107, 53, 0.04));
         box-shadow: inset 3px 0 0 var(--live);
       }
+      /* Semifinal/final match cards get a distinct full outline (in
+         addition to the regular per-division left-border accent set inline
+         via matchDivision/matchBorderStyle above) so these stand out from
+         group/pool matches in the same list at a glance. Combined with
+         .is-live in a separate, higher-specificity rule below since
+         box-shadow isn't additive across separate selectors -- a live
+         semifinal/final needs both effects at once. */
+      .match.is-semifinal {
+        box-shadow: inset 0 0 0 1.5px rgba(255, 153, 51, 0.4);
+      }
+      .match.is-final {
+        box-shadow: inset 0 0 0 1.5px rgba(255, 153, 51, 0.75);
+      }
+      .match.is-live.is-semifinal {
+        box-shadow: inset 3px 0 0 var(--live), inset 0 0 0 1.5px rgba(255, 153, 51, 0.4);
+      }
+      .match.is-live.is-final {
+        box-shadow: inset 3px 0 0 var(--live), inset 0 0 0 1.5px rgba(255, 153, 51, 0.75);
+      }
       .match-top {
         display: flex;
         justify-content: space-between;
@@ -10201,8 +10220,13 @@
           : "";
         const venueText =
           m.eventId === "squash" ? "" : m.venue ? ` · ${m.venue}` : "";
+        const stageClass = isFinalRound(m.round)
+          ? "is-final"
+          : isSemifinalRound(m.round)
+            ? "is-semifinal"
+            : "";
         return `
-  <div class="match ${isLive ? "is-live" : ""}"${matchBorderStyle} data-matchid="${m.matchId}">
+  <div class="match ${isLive ? "is-live" : ""} ${stageClass}"${matchBorderStyle} data-matchid="${m.matchId}">
     <div class="match-top">
       <span class="match-info">
         ${division.label ? `<span class="division-pill" style="background:${division.style.bg};color:${division.style.text};">${division.label}</span>` : ""}
@@ -10358,6 +10382,14 @@
         if (round === "Final" || round === "U15-F" || round === "U15-FINAL")
           return true;
         return round.endsWith(" - Final");
+      }
+      // Same shape as isFinalRound but for the semifinal round -- bare
+      // "Semifinal" for single-bracket events, or "<band/bracket> -
+      // Semifinal" for age-banded ones (e.g. "Under 46 - Semifinal").
+      function isSemifinalRound(round) {
+        if (!round) return false;
+        if (round === "Semifinal") return true;
+        return round.endsWith(" - Semifinal");
       }
       // null for a single-winner event (plain "Final", no label needed);
       // otherwise the age-band/bracket name, e.g. "Under 26", "15-25 Bracket".

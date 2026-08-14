@@ -321,6 +321,16 @@ group/pool standings are tallied; they are not auto-computed from match results.
   `squashDivisionLabel`, unchanged) since match.code parses more reliably than its round text
   for that event; every other event's pill just shows the round text
   (`formatRoundLabel(m.round)`).
+- **Semifinal/final match cards get a distinct full outline** (user request), on top of
+  (not replacing) the per-division left-border accent above: `isSemifinalRound(round)`
+  (new, mirrors the existing `isFinalRound`) and `isFinalRound(round)` add `.is-semifinal`/
+  `.is-final` to the `.match` div in `renderMatchRow`, giving it a saffron `inset` box-shadow
+  outline (final's is more opaque than semifinal's, so a final still reads as more
+  prominent) — combined with `.is-live`'s own inset box-shadow via an explicit
+  `.match.is-live.is-final`/`.match.is-live.is-semifinal` rule, since box-shadow isn't
+  additive across separate selectors and a live semifinal/final needs both effects at once.
+  Applies everywhere `renderMatchRow` is used (home list, search results, Players Master,
+  event results summary uses its own separate rendering so is unaffected).
 - No "day filter" chips (removed by user request) — only sport filter chips remain.
 - No "ADMIN MODE" banner (removed by user request) — admin controls live inside the
   **☰ hamburger menu** (top-right), not as standalone header icons. The header itself
