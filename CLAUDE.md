@@ -401,9 +401,17 @@ group/pool standings are tallied; they are not auto-computed from match results.
 - **"✎ edit" shows on every player slot**, not just unresolved/TBD ones (widened by user
   request — same `openEditModal`/`overrideA`/`overrideB` mechanism as before, just no longer
   gated on `resolved.tbd`). Lets admin correct a typo in any name, fixed or resolved,
-  post-hoc. Editing a slot never touches the match's own stored `winnerName`/`loserName`
-  fields (only `resolveSlot` output, via `override`, changes) — display is always consistent
-  since every render path reads names through `resolveSlot`, not those raw fields.
+  post-hoc. Tapping "✎ edit" opens a **"Edit Player Name?"** Go Ahead/Cancel confirm first
+  (`#edit-confirm-modal`, `openEditConfirmModal`, added by user request — same
+  safety-net pattern as Confirm Winner/Reset Result/Switch Winner) before the actual
+  name-edit modal (`#edit-modal`) opens; Cancel/✕ leaves the match untouched, "Go Ahead"
+  calls `openEditModal` with the same args it used to receive directly from the tap. If the
+  slot being edited is the winner or loser of an already-completed match, `saveSlotOverride`
+  (shared by the edit modal's Save button and the stale-override suggestion badge — see the
+  "Group/pool standings auto-resolution" section below) also patches the match's own stored
+  `winnerName`/`loserName` fields, since a downstream match's `placeholder` slot (e.g. a
+  Final referencing this semifinal) reads those frozen fields directly rather than
+  re-resolving this match's slots live.
 - **Edit modal suggests existing players** instead of a blank free-text field (by user
   request) — `#edit-name-dropdown` (reuses the `.search-dropdown`/`.search-option` styling
   from the header search) defaults to every already-known player scoped to the same event

@@ -1663,6 +1663,23 @@
       </div>
     </div>
 
+    <!-- Edit Name Confirm Modal -->
+    <div class="modal-overlay" id="edit-confirm-modal">
+      <div class="modal">
+        <button class="modal-close" id="edit-confirm-close">✕</button>
+        <h2>Edit Player Name?</h2>
+        <p class="sub" id="edit-confirm-sub"></p>
+        <div class="modal-actions">
+          <button class="btn ghost" id="edit-confirm-cancel" style="flex: 1">
+            Cancel
+          </button>
+          <button class="btn primary" id="edit-confirm-go" style="flex: 1">
+            Go Ahead
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Edit Slot Modal -->
     <div class="modal-overlay" id="edit-modal">
       <div class="modal">
@@ -9974,6 +9991,38 @@
       });
 
       /* ===================== EDIT SLOT ===================== */
+      // Tapping "✎ edit" opens a Go Ahead/Cancel confirm first (matching the
+      // Confirm Winner/Reset Result/Switch Winner pattern) rather than
+      // jumping straight into the name-edit modal -- a safety net against a
+      // mis-tap on the small edit link, same reasoning as those other
+      // confirms.
+      let pendingEditConfirm = null; // {matchId, slotKey, currentName} awaiting confirm in edit-confirm-modal
+      function openEditConfirmModal(matchId, slotKey, currentName) {
+        const match = state.matchesById[matchId];
+        pendingEditConfirm = { matchId, slotKey, currentName };
+        const label = match && match.matchNumber ? `Match ${match.matchNumber}` : match?.code;
+        document.getElementById("edit-confirm-sub").textContent =
+          currentName && currentName !== "TBD"
+            ? `Edit ${currentName}'s name${label ? ` for ${label}` : ""}?`
+            : `Fill in this player's name${label ? ` for ${label}` : ""}?`;
+        document.getElementById("edit-confirm-modal").classList.add("show");
+      }
+      function closeEditConfirmModal() {
+        document.getElementById("edit-confirm-modal").classList.remove("show");
+        pendingEditConfirm = null;
+      }
+      document
+        .getElementById("edit-confirm-close")
+        .addEventListener("click", closeEditConfirmModal);
+      document
+        .getElementById("edit-confirm-cancel")
+        .addEventListener("click", closeEditConfirmModal);
+      document.getElementById("edit-confirm-go").addEventListener("click", () => {
+        const pending = pendingEditConfirm;
+        closeEditConfirmModal();
+        if (pending) openEditModal(pending.matchId, pending.slotKey, pending.currentName);
+      });
+
       let editNameCandidates = []; // scoped (event+category) player pool for the open edit modal
       let editNameShowAll = false; // true once "Show more" expands to every tournament player
       function openEditModal(matchId, slotKey, currentName) {
@@ -10267,7 +10316,7 @@
               e.stopPropagation();
               const slotKey = editEl.dataset.edit;
               const resolved = resolveSlot(match, slotKey);
-              openEditModal(matchId, slotKey, resolved.name);
+              openEditConfirmModal(matchId, slotKey, resolved.name);
             });
           });
           matchEl.querySelectorAll("[data-applysuggestion]").forEach((el) => {
