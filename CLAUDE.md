@@ -58,9 +58,9 @@ names, and import/export the whole dataset as JSON.
   on a schedule (every 4 hours, cron `0 */4 * * *`, plus manual
   `workflow_dispatch`) and commits the result to `data-backups/backup-<ISO
   timestamp>.json` if anything changed. This is deliberately broader than the
-  admin's own **⇅ Import/Export** screen in the app, which only round-trips
+  admin's own **⇅ Import/Export** screen's *export* side, which only round-trips
   `events`/`matches`/`pendingPlayers` as `.xlsx` — the scheduled backup also
-  captures `playerPayments`, which the in-app export doesn't touch at all.
+  captures `playerPayments`, which the in-app `.xlsx` export doesn't touch at all.
   The workflow prunes to the most recent 30 snapshots (~5 days at the default
   cadence) so the repo doesn't grow unbounded.
 - **Setup required (one-time, can't be done from this session):** create a
@@ -70,11 +70,27 @@ names, and import/export the whole dataset as JSON.
   as a GitHub Actions secret named `FIREBASE_BACKUP_SERVICE_ACCOUNT_KEY` on
   this repo (Settings → Secrets and variables → Actions). Without that
   secret the workflow will fail every run with an auth error.
-- **Restoring:** `scripts/restore-firestore.mjs <backup-file.json> --confirm`,
-  run locally by an admin (never from CI). It deletes every existing doc in
-  each of the 4 collections and rewrites them from the backup file — the same
-  "wipe and rewrite" semantics as the app's own Override flow, just covering
-  all 4 collections. Needs a service account key with *write* access
+- **Restoring, in-app (the normal path):** the **⇅ Import/Export** modal has a
+  second section, **"Restore From Backup Snapshot"**, below the existing
+  `.xlsx` import — "🕐 Browse Snapshots…" lists `data-backups/` via GitHub's
+  public, unauthenticated, CORS-enabled Contents API (`BACKUP_REPO`/
+  `BACKUP_BRANCH` consts near `firebaseConfig`; no token needed since the repo
+  is public), auto-loads the most recent one, and shows a picker (`<select>`)
+  for older ones. Picking a snapshot fetches its raw JSON, and "Override With
+  Snapshot" does the same delete-all-then-rewrite as the `.xlsx` override —
+  except it also wipes and rewrites `playerPayments`, since a snapshot (unlike
+  an `.xlsx` file) actually carries that collection. `pendingImportData`/
+  `pendingImportSource`/the override button/its confirm-and-write handler are
+  now shared between both the `.xlsx` and snapshot paths (see `io-override-btn`
+  click handler) — the `playerPayments` collection is only touched when
+  `pendingImportData.playerPayments` is present, so `.xlsx` imports still never
+  touch payment records, exactly as before. Choosing a file clears any pending
+  snapshot selection and vice versa (only one source can be "loaded and ready
+  to override with" at a time).
+- **Restoring, from the command line (disaster recovery / no browser):**
+  `scripts/restore-firestore.mjs <backup-file.json> --confirm`, run locally by
+  an admin (never from CI). Same wipe-and-rewrite semantics across all 4
+  collections. Needs a service account key with *write* access
   (`roles/datastore.user` or broader) via `FIREBASE_SERVICE_ACCOUNT_KEY` or
   `GOOGLE_APPLICATION_CREDENTIALS` — deliberately kept separate from (and
   more privileged than) the read-only key used by the scheduled backup, and

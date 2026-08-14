@@ -1606,6 +1606,42 @@
           <div class="error-text" id="io-error"></div>
         </div>
 
+        <div
+          class="field"
+          style="
+            margin-top: 18px;
+            border-top: 1px solid var(--border);
+            padding-top: 16px;
+          "
+        >
+          <label>Restore From Backup Snapshot</label>
+          <p style="font-size: 11.5px; color: var(--muted); margin: 0 0 10px">
+            Pick one of the automated backups (taken every few hours by
+            <code>firestore-backup.yml</code>) and replace all current data
+            with it — including payment records, which the file export above
+            doesn't cover.
+          </p>
+          <button class="btn ghost" id="io-snapshot-browse-btn" style="width: 100%">
+            🕐 Browse Snapshots…
+          </button>
+          <select
+            id="io-snapshot-select"
+            style="display: none; width: 100%; margin-top: 8px"
+          ></select>
+          <div
+            id="io-snapshot-summary"
+            style="
+              font-size: 12px;
+              color: var(--info);
+              margin-top: 8px;
+              display: none;
+            "
+          ></div>
+          <div class="error-text" id="io-snapshot-error"></div>
+        </div>
+
+        <div class="error-text" id="io-write-error" style="margin-top: 10px"></div>
+
         <div class="modal-actions">
           <button class="btn ghost" id="io-cancel" style="flex: 1">
             Close
@@ -8187,6 +8223,13 @@
         messagingSenderId: "1021213147771",
         appId: "1:1021213147771:web:21cee95064fee9cab9d8de",
       };
+      // Where scripts/backup-firestore.mjs (see .github/workflows/firestore-backup.yml)
+      // commits its JSON snapshots -- the "Restore From Backup Snapshot"
+      // picker in the Import/Export modal lists/fetches directly from here
+      // via GitHub's public, unauthenticated (CORS-enabled) API/raw content
+      // endpoints. Repo is public, so no token is needed or embedded here.
+      const BACKUP_REPO = "AnkitK1993/test-ekta";
+      const BACKUP_BRANCH = "main";
       const fbApp = initializeApp(firebaseConfig);
       const auth = getAuth(fbApp);
       // Each admin is expected to use their own device (single tab). If
@@ -8905,14 +8948,30 @@
 
       /* ===================== IMPORT / EXPORT ===================== */
       let pendingImportData = null;
+      let pendingImportSource = null; // "file" | "snapshot" -- just for confirm/button wording
+      let snapshotOptions = []; // [{name, download_url, exportedAt}] from the last Browse Snapshots fetch
 
-      document.getElementById("menu-io-item").addEventListener("click", () => {
-        hideMenu();
+      function resetIoModalState() {
         pendingImportData = null;
+        pendingImportSource = null;
         document.getElementById("io-file-summary").style.display = "none";
         document.getElementById("io-override-btn").style.display = "none";
         document.getElementById("io-error").style.display = "none";
         document.getElementById("io-file-input").value = "";
+        document.getElementById("io-snapshot-summary").style.display = "none";
+        document.getElementById("io-snapshot-error").style.display = "none";
+        document.getElementById("io-write-error").style.display = "none";
+        document.getElementById("io-snapshot-select").style.display = "none";
+        document.getElementById("io-snapshot-select").innerHTML = "";
+        document.getElementById("io-snapshot-browse-btn").style.display = "block";
+        document.getElementById("io-snapshot-browse-btn").textContent =
+          "🕐 Browse Snapshots…";
+        snapshotOptions = [];
+      }
+
+      document.getElementById("menu-io-item").addEventListener("click", () => {
+        hideMenu();
+        resetIoModalState();
         document.getElementById("io-modal").classList.add("show");
       });
       document
@@ -9000,7 +9059,12 @@
           errEl.style.display = "none";
           summaryEl.style.display = "none";
           overrideBtn.style.display = "none";
+          // Choosing a file supersedes any pending snapshot selection --
+          // only one source can be "loaded and ready to override with" at a time.
+          document.getElementById("io-snapshot-summary").style.display = "none";
+          document.getElementById("io-snapshot-select").value = "";
           pendingImportData = null;
+          pendingImportSource = null;
           if (!file) return;
 
           const reader = new FileReader();
@@ -9059,12 +9123,14 @@
                 matches,
                 pendingPlayers,
               };
+              pendingImportSource = "file";
               const pendingCount = Object.values(pendingPlayers).reduce(
                 (s, arr) => s + (arr ? arr.length : 0),
                 0,
               );
               summaryEl.innerHTML = `<b>${file.name}</b><br>${events.length} events · ${matches.length} matches · ${pendingCount} pending players`;
               summaryEl.style.display = "block";
+              overrideBtn.textContent = "Override Data";
               overrideBtn.style.display = "block";
             } catch (err) {
               errEl.textContent = "Could not read file: " + err.message;
@@ -9073,6 +9139,117 @@
           };
           reader.readAsArrayBuffer(file);
         });
+
+      /* ===================== RESTORE FROM BACKUP SNAPSHOT ===================== */
+      // Filenames are "backup-<ISO-with-dashes>.json" (see
+      // scripts/backup-firestore.mjs) -- turn one back into a readable
+      // local date/time for the dropdown.
+      function formatSnapshotLabel(filename) {
+        const m = filename.match(/^backup-(.+)\.json$/);
+        if (!m) return filename;
+        const iso = m[1].replace(
+          /^(\d{4})-(\d{2})-(\d{2})T(\d{2})-(\d{2})-(\d{2})-(\d{3})Z$/,
+          "$1-$2-$3T$4:$5:$6.$7Z",
+        );
+        const d = new Date(iso);
+        if (isNaN(d)) return filename;
+        return d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+      }
+
+      document
+        .getElementById("io-snapshot-browse-btn")
+        .addEventListener("click", async () => {
+          const btn = document.getElementById("io-snapshot-browse-btn");
+          const select = document.getElementById("io-snapshot-select");
+          const errEl = document.getElementById("io-snapshot-error");
+          errEl.style.display = "none";
+          btn.textContent = "Loading…";
+          btn.disabled = true;
+          try {
+            const res = await fetch(
+              `https://api.github.com/repos/${BACKUP_REPO}/contents/data-backups?ref=${BACKUP_BRANCH}`,
+            );
+            if (!res.ok) {
+              throw new Error(
+                res.status === 404
+                  ? "No backups found yet — the scheduled workflow hasn't run."
+                  : `GitHub returned ${res.status}`,
+              );
+            }
+            const entries = await res.json();
+            snapshotOptions = entries
+              .filter((e) => e.type === "file" && e.name.endsWith(".json"))
+              .sort((a, b) => b.name.localeCompare(a.name)); // ISO names sort chronologically -- newest first
+            if (!snapshotOptions.length) {
+              throw new Error("No backup snapshots found in data-backups/ yet.");
+            }
+            select.innerHTML = snapshotOptions
+              .map(
+                (e, i) =>
+                  `<option value="${i}">${escapeHtml(formatSnapshotLabel(e.name))}</option>`,
+              )
+              .join("");
+            select.style.display = "block";
+            btn.style.display = "none";
+            select.value = "0";
+            await loadSelectedSnapshot();
+          } catch (err) {
+            errEl.textContent = "Couldn't load snapshot list: " + err.message;
+            errEl.style.display = "block";
+            btn.textContent = "🕐 Browse Snapshots…";
+          } finally {
+            btn.disabled = false;
+          }
+        });
+
+      async function loadSelectedSnapshot() {
+        const select = document.getElementById("io-snapshot-select");
+        const summaryEl = document.getElementById("io-snapshot-summary");
+        const errEl = document.getElementById("io-snapshot-error");
+        const overrideBtn = document.getElementById("io-override-btn");
+        const entry = snapshotOptions[+select.value];
+        if (!entry) return;
+        errEl.style.display = "none";
+        summaryEl.textContent = "Loading snapshot…";
+        summaryEl.style.display = "block";
+        // Choosing a snapshot supersedes any pending file selection.
+        document.getElementById("io-file-summary").style.display = "none";
+        document.getElementById("io-file-input").value = "";
+        overrideBtn.style.display = "none";
+        try {
+          const res = await fetch(entry.download_url);
+          if (!res.ok) throw new Error(`GitHub returned ${res.status}`);
+          const backup = await res.json();
+          const pendingPlayers = {};
+          (backup.pendingPlayers || []).forEach((row) => {
+            if (row && row.id) pendingPlayers[row.id] = row.players || [];
+          });
+          pendingImportData = {
+            events: backup.events || [],
+            matches: backup.matches || [],
+            pendingPlayers,
+            playerPayments: backup.playerPayments || [],
+          };
+          pendingImportSource = "snapshot";
+          const pendingCount = Object.values(pendingPlayers).reduce(
+            (s, arr) => s + (arr ? arr.length : 0),
+            0,
+          );
+          summaryEl.innerHTML = `<b>${escapeHtml(formatSnapshotLabel(entry.name))}</b><br>${pendingImportData.events.length} events · ${pendingImportData.matches.length} matches · ${pendingCount} pending players · ${pendingImportData.playerPayments.length} payment records`;
+          overrideBtn.textContent = "Override With Snapshot";
+          overrideBtn.style.display = "block";
+        } catch (err) {
+          pendingImportData = null;
+          pendingImportSource = null;
+          errEl.textContent = "Couldn't load that snapshot: " + err.message;
+          errEl.style.display = "block";
+          summaryEl.style.display = "none";
+        }
+      }
+
+      document
+        .getElementById("io-snapshot-select")
+        .addEventListener("change", loadSelectedSnapshot);
 
       function chunkArray(arr, size) {
         const out = [];
@@ -9085,10 +9262,17 @@
         .getElementById("io-override-btn")
         .addEventListener("click", async () => {
           if (!pendingImportData) return;
-          const errEl = document.getElementById("io-error");
+          const errEl = document.getElementById("io-write-error");
           errEl.style.display = "none";
+
+          // playerPayments is only ever present on a snapshot restore (the
+          // .xlsx file import never carries it), so it's the one collection
+          // that's conditionally included in both the wording and the writes.
+          const parts = ["events", "matches", "pending players"];
+          if (pendingImportData.playerPayments) parts.push("payment records");
+          const sourceNoun = pendingImportSource === "snapshot" ? "snapshot" : "file";
           const ok = confirm(
-            "This will permanently replace ALL current events, matches and pending players with the contents of this file. Continue?",
+            `This will permanently replace ALL current ${parts.join(", ")} with the contents of this ${sourceNoun}. Continue?`,
           );
           if (!ok) return;
 
@@ -9098,8 +9282,12 @@
           btn.disabled = true;
 
           try {
-            // 1. Delete all existing docs in the three collections
-            for (const colName of ["events", "matches", "pendingPlayers"]) {
+            const collectionsToReplace = ["events", "matches", "pendingPlayers"];
+            if (pendingImportData.playerPayments)
+              collectionsToReplace.push("playerPayments");
+
+            // 1. Delete all existing docs in the collections being replaced
+            for (const colName of collectionsToReplace) {
               const snap = await getDocs(collection(db, colName));
               const refs = snap.docs.map((d) => d.ref);
               for (const group of chunkArray(refs, 450)) {
@@ -9132,9 +9320,20 @@
                 await b.commit();
               }
             }
+            if (pendingImportData.playerPayments) {
+              for (const group of chunkArray(pendingImportData.playerPayments, 450)) {
+                const b = writeBatch(db);
+                group.forEach((p) => b.set(doc(db, "playerPayments", p.id), p));
+                await b.commit();
+              }
+            }
 
             document.getElementById("io-modal").classList.remove("show");
-            toast("✅ <b>Data overridden from file</b>");
+            toast(
+              pendingImportSource === "snapshot"
+                ? "✅ <b>Data restored from snapshot</b>"
+                : "✅ <b>Data overridden from file</b>",
+            );
           } catch (e) {
             console.error(e);
             errEl.textContent = "Override failed: " + e.message;
