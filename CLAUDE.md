@@ -288,6 +288,29 @@ group/pool standings are tallied; they are not auto-computed from match results.
   scale(0.96–0.98) }` press feedback — apply the same pattern to new buttons/cards rather
   than leaving them static. This was a pure CSS pass — no class names, DOM structure, or JS
   behavior changed, so don't assume a visual tweak here implies a behavior change too.
+- **Per-event, per-group division-pill colors** (user request, generalizing what was
+  previously a squash-only feature): every match card's round/division pill and left-border
+  accent is colored, not just squash's. `matchDivisionHue(match)` picks a hue from a fixed
+  15-entry `DIVISION_HUES` palette — large enough that no event's distinct (age-band, group)
+  divisions can ever collide on the same hue (`tt_men` peaks at 12) — via
+  `eventDivisionOrder(eventId)` (same youngest-band-first, Group-A-before-B ordering as the
+  Standings feature, reusing `ageBandSortKey`) for the within-event index, plus a per-event
+  starting offset (`EVENT_COLOR_ORDER`, stride 2 — coprime with 15, so all 9 events land on
+  distinct starting hues) so two different events read as visually distinct even side by side
+  in a mixed list (search results, Players Master schedule). `matchGroupIdentity(match)`
+  extends `matchCategoryPrefix` with the specific group letter *only* while a match is still
+  in its own group/pool stage — once a bracket reaches Semifinal/Final the groups have
+  merged, so those rounds fall back to just the age-band, mirroring squash's pre-existing
+  GA-/GB-/A25- behavior (group-stage matches get their own color, semis/final get a third,
+  separate one for the same age band). `divisionColorStyle(hue)` is theme-aware (dark: bright
+  pastel-on-dark; light: darker/more saturated for contrast on white) and applied via inline
+  `style` on `.division-pill` and the match's left border, not fixed CSS classes, since the
+  number of divisions varies per event and can't be enumerated ahead of time — this replaced
+  the old hardcoded `.match-kids`/`.match-group-a`/`.match-group-b`/`.match-mens` classes
+  entirely. Squash keeps its own short pill *labels* ("Kids", "15-25", etc. via
+  `squashDivisionLabel`, unchanged) since match.code parses more reliably than its round text
+  for that event; every other event's pill just shows the round text
+  (`formatRoundLabel(m.round)`).
 - No "day filter" chips (removed by user request) — only sport filter chips remain.
 - No "ADMIN MODE" banner (removed by user request) — admin controls live inside the
   **☰ hamburger menu** (top-right), not as standalone header icons. The header itself

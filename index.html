@@ -788,6 +788,10 @@
         align-items: center;
         flex-wrap: wrap;
       }
+      /* Division-pill/left-border colors are per-division hues computed in
+         JS (matchDivisionHue/divisionColorStyle) and applied inline, since
+         the number of distinct (event, age-band, group) divisions varies
+         per event and can't be enumerated as fixed classes ahead of time. */
       .division-pill {
         display: inline-flex;
         align-items: center;
@@ -798,38 +802,6 @@
         font-weight: 700;
         text-transform: uppercase;
         letter-spacing: 0.08em;
-      }
-      .match-kids .division-pill {
-        background: rgba(79, 166, 255, 0.14);
-        color: #7cc0ff;
-      }
-      .match-group-a .division-pill {
-        background: rgba(255, 153, 51, 0.16);
-        color: #ffb86b;
-      }
-      .match-group-b .division-pill {
-        background: rgba(33, 221, 125, 0.16);
-        color: #7fe6a6;
-      }
-      .match-mens .division-pill {
-        background: rgba(130, 130, 255, 0.14);
-        color: #b2b8ff;
-      }
-      .match.match-kids {
-        border-left: 3px solid rgba(79, 166, 255, 0.65);
-      }
-      .match.match-group-a {
-        border-left: 3px solid rgba(255, 153, 51, 0.65);
-      }
-      .match.match-group-b {
-        border-left: 3px solid rgba(33, 221, 125, 0.65);
-      }
-      .match.match-mens {
-        border-left: 3px solid rgba(130, 130, 255, 0.65);
-      }
-      .match-round-tag .division-pill {
-        background: rgba(255, 255, 255, 0.08);
-        color: var(--muted);
       }
       .live-badge {
         background: linear-gradient(135deg, var(--live), #ff8c5a);
@@ -8585,31 +8557,117 @@
         return round ? round.replace(/\bPool\b/g, "Group") : round;
       }
 
-      function squashDivision(match) {
+      // Squash keeps its own short, friendly division labels (derived from
+      // match.code, which is more reliable than round text for its
+      // Kids/15-25/Above-25 bracket naming) -- every other event's pill just
+      // shows the round text itself. Color is handled separately, generically,
+      // by matchDivisionHue below, for every event including squash.
+      function squashDivisionLabel(match) {
         const code = match.code || "";
-        if (code.startsWith("U15-")) {
-          return { label: "Kids", className: "match-kids" };
-        }
-        if (code.startsWith("GA-")) {
-          return { label: "Group A", className: "match-group-a" };
-        }
-        if (code.startsWith("GB-")) {
-          return { label: "Group B", className: "match-group-b" };
-        }
-        if (code.startsWith("GC-")) {
-          return { label: "15-25", className: "match-group-b" };
-        }
-        if (code.startsWith("A25-")) {
-          return { label: "Above 25", className: "match-mens" };
-        }
-        return { label: "", className: "" };
+        if (code.startsWith("U15-")) return "Kids";
+        if (code.startsWith("GA-")) return "Group A";
+        if (code.startsWith("GB-")) return "Group B";
+        if (code.startsWith("GC-")) return "15-25";
+        if (code.startsWith("A25-")) return "Above 25";
+        return "";
+      }
+
+      // A match's age-band prefix (matchCategoryPrefix) plus, only while it's
+      // still in its own group/pool stage, the specific group letter -- once
+      // a bracket reaches Semifinal/Final the groups have merged, so those
+      // rounds fall back to just the age-band (no letter), same as squash's
+      // existing A25- semis/final already being a separate color from GA-/GB-.
+      function matchGroupIdentity(match) {
+        const round = match.round || "";
+        const prefix = matchCategoryPrefix(match);
+        if (round.endsWith(" - Group A") || round === "Pool A")
+          return { prefix, group: "A" };
+        if (round.endsWith(" - Group B") || round === "Pool B")
+          return { prefix, group: "B" };
+        return { prefix, group: null };
+      }
+
+      // Every distinct (age-band, group) division that actually occurs in one
+      // event, ordered the same way as the Standings groups (youngest age
+      // band first, Group A before Group B) -- used only to pick a stable,
+      // collision-free color index per division within that event.
+      function eventDivisionOrder(eventId) {
+        const divisions = new Map();
+        state.matches
+          .filter((m) => m.eventId === eventId)
+          .forEach((m) => {
+            const { prefix, group } = matchGroupIdentity(m);
+            const key = prefix + (group ? " Group " + group : "");
+            if (!divisions.has(key)) divisions.set(key, { prefix, group, key });
+          });
+        return [...divisions.values()]
+          .sort(
+            (a, b) =>
+              ageBandSortKey(a.prefix) - ageBandSortKey(b.prefix) ||
+              (a.group || "").localeCompare(b.group || ""),
+          )
+          .map((d) => d.key);
+      }
+
+      // 15 well-spread hues shared by every event's division pills -- at
+      // least as many as the most-divided event ever needs (tt_men peaks at
+      // 12: 3 age bands x {base/merged, Group A, Group B} + Under 26's own
+      // single pool + Above 46's own bracket), so no two divisions in the
+      // same event can ever collide on the same hue regardless of how many
+      // there are. Each event also starts from a different point in this
+      // palette (stride of 2, coprime with the 15-hue palette so all 9
+      // events land on distinct starting hues -- via its fixed position in
+      // EVENT_COLOR_ORDER, not state.events' live order, which Firestore
+      // doesn't guarantee matches SEED_DATA's insertion order, same issue the
+      // sport chips had) so two different events' matches read as visually distinct even side
+      // by side in a mixed list (search results, Players Master schedule).
+      const DIVISION_HUES = [
+        212, 28, 148, 265, 330, 48, 190, 355, 100, 235, 60, 15, 300, 170, 80,
+      ];
+      const EVENT_COLOR_ORDER = [
+        "tt_women",
+        "tt_doubles",
+        "tt_men",
+        "carrom_men",
+        "carrom_women",
+        "carrom_doubles",
+        "pool",
+        "chess",
+        "squash",
+      ];
+      function matchDivisionHue(match) {
+        const order = eventDivisionOrder(match.eventId);
+        const { prefix, group } = matchGroupIdentity(match);
+        const key = prefix + (group ? " Group " + group : "");
+        const idx = Math.max(0, order.indexOf(key));
+        // Stride of 2 is coprime with a 15-hue palette, so all 9 events land
+        // on 9 different starting hues (a stride of 3 only produced 5
+        // distinct starting points across 9 events, colliding every 5th one).
+        const eventOffset = Math.max(0, EVENT_COLOR_ORDER.indexOf(match.eventId)) * 2;
+        return DIVISION_HUES[(idx + eventOffset) % DIVISION_HUES.length];
+      }
+      // Theme-aware pill/border colors for a given hue -- dark theme reads as
+      // bright pastel-on-dark (same formula the old hardcoded squash colors
+      // used), light theme flips to a darker, more saturated tone so the
+      // pill text stays legible on a white background.
+      function divisionColorStyle(hue) {
+        const dark = state.theme !== "light";
+        return {
+          bg: `hsla(${hue}, 85%, ${dark ? 60 : 42}%, ${dark ? 0.16 : 0.14})`,
+          text: `hsl(${hue}, ${dark ? 90 : 80}%, ${dark ? 74 : 32}%)`,
+          border: `hsla(${hue}, 85%, ${dark ? 60 : 42}%, 0.6)`,
+        };
       }
 
       function matchDivision(m) {
-        if (m.eventId === "squash") return squashDivision(m);
-        return m.round
-          ? { label: formatRoundLabel(m.round), className: "match-round-tag" }
-          : { label: "", className: "" };
+        const label =
+          m.eventId === "squash"
+            ? squashDivisionLabel(m)
+            : m.round
+              ? formatRoundLabel(m.round)
+              : "";
+        if (!label) return { label: "", style: null };
+        return { label, style: divisionColorStyle(matchDivisionHue(m)) };
       }
 
       // Age-band/bracket key for a match, e.g. "Above 46", "Above 25 Bracket",
@@ -10022,13 +10080,16 @@
 
         const displayCode = m.matchNumber ? `Match ${m.matchNumber}` : m.code;
         const division = matchDivision(m);
+        const matchBorderStyle = division.style
+          ? ` style="border-left:3px solid ${division.style.border};"`
+          : "";
         const venueText =
           m.eventId === "squash" ? "" : m.venue ? ` · ${m.venue}` : "";
         return `
-  <div class="match ${isLive ? "is-live" : ""} ${division.className}" data-matchid="${m.matchId}">
+  <div class="match ${isLive ? "is-live" : ""}"${matchBorderStyle} data-matchid="${m.matchId}">
     <div class="match-top">
       <span class="match-info">
-        ${division.label ? `<span class="division-pill ${division.className}">${division.label}</span>` : ""}
+        ${division.label ? `<span class="division-pill" style="background:${division.style.bg};color:${division.style.text};">${division.label}</span>` : ""}
         ${displayCode || ""}${m.day ? ` · ${m.day}` : ""}${m.time ? `, ${m.time}` : ""}${venueText}
       </span>
       ${isLive ? '<span class="live-badge"><span class="live-dot"></span>LIVE</span>' : ""}
