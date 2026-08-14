@@ -658,7 +658,7 @@
         backdrop-filter: blur(16px);
         border: 1px solid var(--glass-border);
         border-radius: var(--radius);
-        margin-bottom: 12px;
+        margin-bottom: 8px;
         overflow: hidden;
         box-shadow: var(--shadow);
         transition: border-color 0.25s var(--ease), box-shadow 0.25s var(--ease),
@@ -673,10 +673,10 @@
         box-shadow: var(--shadow-lg), 0 0 0 1px rgba(255, 153, 51, 0.08);
       }
       .event-head {
-        padding: 14px 16px;
+        padding: 11px 16px;
         display: flex;
         align-items: center;
-        justify-content: between;
+        justify-content: space-between;
         gap: 10px;
         cursor: pointer;
         user-select: none;
@@ -695,10 +695,12 @@
       .event-name {
         font-weight: 700;
         font-size: 15px;
+        line-height: 1.25;
       }
       .event-match-count {
         font-size: 11px;
         font-weight: 700;
+        line-height: 1.25;
         color: var(--muted);
         font-family: "IBM Plex Mono";
         background: var(--surface3);
@@ -715,6 +717,7 @@
       .status-badge {
         font-size: 10px;
         font-weight: 700;
+        line-height: 1.25;
         padding: 3px 9px;
         border-radius: 20px;
         text-transform: uppercase;
