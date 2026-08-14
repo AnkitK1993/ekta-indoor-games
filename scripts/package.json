@@ -1,0 +1,13 @@
+{
+  "name": "ekta-games-backup-scripts",
+  "private": true,
+  "type": "module",
+  "description": "Firestore backup/restore tooling for the Ekta Independence Day Games 2026 tracker. Not part of the deployed app (index.html) -- run with Node.",
+  "scripts": {
+    "backup": "node backup-firestore.mjs",
+    "restore": "node restore-firestore.mjs"
+  },
+  "dependencies": {
+    "firebase-admin": "^12.7.0"
+  }
+}

@@ -53,6 +53,38 @@ names, and import/export the whole dataset as JSON.
   backgrounded) since that toast is for catching a *live* transition, not
   catching up after the fact.
 
+## Automated Firestore backups
+- **`.github/workflows/firestore-backup.yml`** runs `scripts/backup-firestore.mjs`
+  on a schedule (every 4 hours, cron `0 */4 * * *`, plus manual
+  `workflow_dispatch`) and commits the result to `data-backups/backup-<ISO
+  timestamp>.json` if anything changed. This is deliberately broader than the
+  admin's own **⇅ Import/Export** screen in the app, which only round-trips
+  `events`/`matches`/`pendingPlayers` as `.xlsx` — the scheduled backup also
+  captures `playerPayments`, which the in-app export doesn't touch at all.
+  The workflow prunes to the most recent 30 snapshots (~5 days at the default
+  cadence) so the repo doesn't grow unbounded.
+- **Setup required (one-time, can't be done from this session):** create a
+  Firebase/GCP service account with **read-only** Firestore access
+  (`roles/datastore.viewer` is enough — this key lives in GitHub Actions, so
+  keep its permissions minimal), download its JSON key, and add the full JSON
+  as a GitHub Actions secret named `FIREBASE_BACKUP_SERVICE_ACCOUNT_KEY` on
+  this repo (Settings → Secrets and variables → Actions). Without that
+  secret the workflow will fail every run with an auth error.
+- **Restoring:** `scripts/restore-firestore.mjs <backup-file.json> --confirm`,
+  run locally by an admin (never from CI). It deletes every existing doc in
+  each of the 4 collections and rewrites them from the backup file — the same
+  "wipe and rewrite" semantics as the app's own Override flow, just covering
+  all 4 collections. Needs a service account key with *write* access
+  (`roles/datastore.user` or broader) via `FIREBASE_SERVICE_ACCOUNT_KEY` or
+  `GOOGLE_APPLICATION_CREDENTIALS` — deliberately kept separate from (and
+  more privileged than) the read-only key used by the scheduled backup, and
+  deliberately never automated/scheduled since restoring is a destructive,
+  human-in-the-loop decision. Running without `--confirm` prints a dry-run
+  summary and writes nothing.
+- `scripts/` has its own `package.json` (`firebase-admin`) — `npm install`
+  inside `scripts/` before running either script locally. Not part of the
+  deployed app; `index.html` doesn't depend on anything in `scripts/`.
+
 ## Data model (see SEED_DATA constant embedded in the HTML file)
 - `events`: `{id, name, sport, category, gender, day, format, equipment, status}`.
   `status` is `"ready"` (has real matches) or `"pending"` (roster only, no bracket yet).
