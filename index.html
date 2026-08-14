@@ -9686,6 +9686,7 @@
             winnerName: winner.name,
             winnerAge: winner.age || null,
             loserName: loser.name,
+            completedAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
           },
           { merge: true },
@@ -9773,6 +9774,7 @@
             winnerName: null,
             winnerAge: null,
             loserName: null,
+            completedAt: null,
             updatedAt: serverTimestamp(),
           },
           { merge: true },
@@ -10212,10 +10214,30 @@
       // A completed match sinks straight to the bottom of its event's list
       // (the admin already confirmed the winner via the Yes/No modal before
       // it got marked completed, so there's no separate revert window here).
+      // Within that finished pile, the most recently-marked result sits at
+      // the TOP (i.e. right under the still-active matches) rather than
+      // sorted by scheduled day/time -- `completedAt` (set by confirmWinner,
+      // cleared by resetMatch) is the actual "just marked" signal, distinct
+      // from `updatedAt` which also moves on live-toggle/name-edit writes.
+      // Matches completed before this field existed (or a pending
+      // fire-and-forget write whose serverTimestamp hasn't resolved yet)
+      // have no completedAt -- treated as older than anything that does,
+      // falling back to chronological order among themselves/each other.
+      function completedAtMillis(m) {
+        const ts = m.completedAt;
+        return ts && typeof ts.toMillis === "function" ? ts.toMillis() : null;
+      }
       function compareForEventPile(a, b) {
         const aBottom = isMatchResolvedComplete(a);
         const bBottom = isMatchResolvedComplete(b);
         if (aBottom !== bBottom) return aBottom ? 1 : -1;
+        if (aBottom && bBottom) {
+          const at = completedAtMillis(a);
+          const bt = completedAtMillis(b);
+          if (at != null && bt != null) return bt - at;
+          if (at != null) return -1;
+          if (bt != null) return 1;
+        }
         return compareMatches(a, b);
       }
 

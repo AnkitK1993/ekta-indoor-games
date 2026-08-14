@@ -106,7 +106,10 @@ names, and import/export the whole dataset as JSON.
   `status` is `"ready"` (has real matches) or `"pending"` (roster only, no bracket yet).
   Every event is currently `"ready"` — nothing is pending.
 - `matches`: `{matchId, eventId, round, code, matchNumber, time, venue, day, playerA,
-  playerB, status, winnerSlot, winnerName, winnerAge, loserName, overrideA, overrideB}`.
+  playerB, status, winnerSlot, winnerName, winnerAge, loserName, overrideA, overrideB,
+  completedAt}`. `completedAt` is a `serverTimestamp()` stamped by `confirmWinner` and
+  cleared by `resetMatch` — sort-order-only (see "finished pile" ordering below), not a
+  revert window.
   `matchNumber` is an ascending integer **scoped per event** (1..N within each event's
   own matches, reassigned in chronological order whenever that event is reflowed) —
   **not** a single global sequence across the whole 297-match schedule. Shown in the
@@ -352,7 +355,19 @@ group/pool standings are tallied; they are not auto-computed from match results.
   **Confirm Winner modal** below rather than a grace period after the fact.
   This sink-to-bottom behavior only applies to the home page's per-event list
   — search results and Players Master still sort matches purely
-  chronologically.
+  chronologically. **Within that sunk-to-the-bottom "finished" pile, the
+  most recently-marked result sits at the top** (right under the still-active
+  matches), not sorted by scheduled day/time like everything else —
+  `confirmWinner` stamps a `completedAt: serverTimestamp()` on the match doc
+  (cleared back to `null` by `resetMatch`) purely to drive this ordering, and
+  `compareForEventPile` sorts the finished group by it descending. This is a
+  new, distinct field from the old removed `state.completedAt`/
+  `isHeldCompleted` client-side hold-timer mentioned above — it's a persisted
+  Firestore field used only for sort order, not a revert window. A match
+  completed before this field existed (or mid-flight on a fire-and-forget
+  write whose `serverTimestamp()` hasn't resolved yet) has no `completedAt`
+  and sorts as older than anything that does, falling back to chronological
+  order in that case.
 - **No "Mark Result"/"Edit Result"/"Reset" buttons** (removed by user request — these are
   three of the match-admin buttons that were deliberately removed and shouldn't come back).
   Marking/changing/undoing a result is a tap gesture on the player themselves: tapping a
