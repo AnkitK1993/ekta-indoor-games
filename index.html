@@ -9968,11 +9968,27 @@
         const target = state.currentEditTarget;
         if (!target || !val) return;
         const field = "override" + target.slotKey;
-        setDoc(
-          doc(db, "matches", target.matchId),
-          { [field]: val, updatedAt: serverTimestamp() },
-          { merge: true },
-        ).catch((e) => {
+        const patch = { [field]: val, updatedAt: serverTimestamp() };
+        // If this slot is the winner or loser of an already-completed match,
+        // a later name correction here (via ✎ edit) needs to also update the
+        // frozen winnerName/loserName fields -- resolveSlot's `placeholder`
+        // branch (for a next-round match, e.g. a Final referencing this
+        // semifinal) reads those frozen fields directly rather than
+        // re-resolving this match's slots live, so without this it would
+        // keep showing the pre-edit name downstream even though this
+        // match's own card now displays the corrected one.
+        const match = state.matchesById[target.matchId];
+        if (match && match.status === "completed") {
+          if (match.winnerSlot === target.slotKey) {
+            patch.winnerName = val;
+            patch.winnerAge = null;
+          } else {
+            patch.loserName = val;
+          }
+        }
+        setDoc(doc(db, "matches", target.matchId), patch, {
+          merge: true,
+        }).catch((e) => {
           console.error(e);
           toast("⚠️ Couldn't save name — please try again", "error");
         });
