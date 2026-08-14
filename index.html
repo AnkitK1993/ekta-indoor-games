@@ -8503,6 +8503,21 @@
         return { name: "TBD", age: null, tbd: true };
       }
 
+      // A match's own `status`/`winnerSlot` fields are frozen at the moment
+      // it's completed — but a `manual` (group-standings) or `placeholder`
+      // slot it depends on can become unresolved again afterwards (e.g. an
+      // admin resets a group-stage match, which un-resolves "Group A 1st").
+      // resolveSlot already reacts correctly to that (the slot goes back to
+      // showing "Group A 1st" / "Winner of M3"), but the *match*'s stored
+      // completed/winner status doesn't auto-revert with it, which would
+      // otherwise show a TBD player wearing the winner trophy and get
+      // counted as a played match. Treat a match as "really" completed only
+      // when both its slots currently resolve to an actual player.
+      function isMatchResolvedComplete(m) {
+        if (m.status !== "completed") return false;
+        return !resolveSlot(m, "A").tbd && !resolveSlot(m, "B").tbd;
+      }
+
       /* ===================== DATA SYNC ===================== */
       function seedIfNeeded_UIOnly() {
         // If Firestore has no events yet, fall back to local SEED_DATA for display (read-only) until admin seeds.
@@ -9336,7 +9351,7 @@
           const ev = eventById(m.eventId);
           return ev && ev.status === "ready";
         });
-        const done = relevant.filter((m) => m.status === "completed").length;
+        const done = relevant.filter(isMatchResolvedComplete).length;
         const total = relevant.length;
         document.getElementById("progress-label").textContent =
           `${done} / ${total} matches played`;
@@ -9368,7 +9383,11 @@
         const a = resolveSlot(m, "A"),
           b = resolveSlot(m, "B");
         const isLive = m.status === "live";
-        const isDone = m.status === "completed";
+        // Not just m.status === "completed": a manual/placeholder slot this
+        // match's winner came from can un-resolve later (e.g. an admin
+        // resets the group-stage match that decided "Group A 1st"), which
+        // must not leave this match showing a TBD player wearing the trophy.
+        const isDone = m.status === "completed" && !a.tbd && !b.tbd;
         const aWin = isDone && m.winnerSlot === "A";
         const bWin = isDone && m.winnerSlot === "B";
 
@@ -9509,8 +9528,8 @@
         return Date.now() - at < 5000;
       }
       function compareForEventPile(a, b) {
-        const aBottom = a.status === "completed" && !isHeldCompleted(a);
-        const bBottom = b.status === "completed" && !isHeldCompleted(b);
+        const aBottom = isMatchResolvedComplete(a) && !isHeldCompleted(a);
+        const bBottom = isMatchResolvedComplete(b) && !isHeldCompleted(b);
         if (aBottom !== bBottom) return aBottom ? 1 : -1;
         return compareMatches(a, b);
       }
@@ -9537,7 +9556,7 @@
       }
       function eventResultsSummaryHtml(evMatches) {
         const finals = evMatches
-          .filter((m) => m.status === "completed" && isFinalRound(m.round))
+          .filter((m) => isMatchResolvedComplete(m) && isFinalRound(m.round))
           .sort(compareMatches);
         if (!finals.length) return "";
         return `<div class="event-results-summary">${finals
@@ -9572,10 +9591,10 @@
         if (ev.status === "pending") return 1;
         const evMatches = state.matches.filter((m) => m.eventId === ev.id);
         if (!evMatches.length) return 1;
-        const done = evMatches.filter((m) => m.status === "completed").length;
+        const done = evMatches.filter(isMatchResolvedComplete).length;
         if (done === evMatches.length) return 2;
         const started = evMatches.some(
-          (m) => m.status === "live" || m.status === "completed",
+          (m) => m.status === "live" || isMatchResolvedComplete(m),
         );
         return started ? 0 : 1;
       }
@@ -9619,7 +9638,7 @@
                 .filter((m) => m.eventId === ev.id)
                 .sort(compareForEventPile);
               total = evMatches.length;
-              done = evMatches.filter((m) => m.status === "completed").length;
+              done = evMatches.filter(isMatchResolvedComplete).length;
               const progressHtml = `
         <div class="progress-row event-progress-row">
           <span>${done} / ${total} matches played</span>
