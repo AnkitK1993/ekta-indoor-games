@@ -15,10 +15,15 @@
     />
     <style>
       :root {
-        --bg: #0b0e14;
+        --bg: #05070c;
+        --bg-glow-1: rgba(255, 153, 51, 0.14);
+        --bg-glow-2: rgba(47, 191, 113, 0.11);
         --surface: #141821;
         --surface2: #1c212c;
         --surface3: #232a38;
+        --glass: rgba(255, 255, 255, 0.045);
+        --glass-strong: rgba(20, 24, 34, 0.72);
+        --glass-border: rgba(255, 255, 255, 0.09);
         --text: #edeff4;
         --muted: #8892a6;
         --muted-dim: #5c6478;
@@ -30,15 +35,29 @@
         --info: #4fa6ff;
         --info-dim: #132a3f;
         --saffron: #ff9933;
+        --saffron-bright: #ffb347;
         --indiagreen: #128807;
         --shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
-        --radius: 14px;
+        --shadow-lg: 0 24px 70px rgba(0, 0, 0, 0.5), 0 2px 10px rgba(0, 0, 0, 0.3);
+        --glow-saffron: 0 0 0 1px rgba(255, 153, 51, 0.28), 0 0 26px rgba(255, 153, 51, 0.3);
+        --glow-win: 0 0 0 1px rgba(47, 191, 113, 0.28), 0 0 24px rgba(47, 191, 113, 0.3);
+        --glow-live: 0 0 0 1px rgba(255, 107, 53, 0.32), 0 0 24px rgba(255, 107, 53, 0.34);
+        --glow-info: 0 0 0 1px rgba(79, 166, 255, 0.28), 0 0 22px rgba(79, 166, 255, 0.28);
+        --radius: 18px;
+        --radius-sm: 12px;
+        --radius-lg: 24px;
+        --ease: cubic-bezier(0.22, 1, 0.36, 1);
       }
       [data-theme="light"] {
-        --bg: #f3f4f7;
+        --bg: #eef0f6;
+        --bg-glow-1: rgba(255, 153, 51, 0.12);
+        --bg-glow-2: rgba(47, 191, 113, 0.1);
         --surface: #ffffff;
         --surface2: #f0f1f5;
         --surface3: #e7e9ef;
+        --glass: rgba(255, 255, 255, 0.55);
+        --glass-strong: rgba(255, 255, 255, 0.8);
+        --glass-border: rgba(20, 24, 33, 0.08);
         --text: #141821;
         --muted: #6b7280;
         --muted-dim: #9ca3af;
@@ -50,6 +69,11 @@
         --info: #2e7fd9;
         --info-dim: #dcebfc;
         --shadow: 0 8px 24px rgba(20, 24, 33, 0.08);
+        --shadow-lg: 0 20px 48px rgba(20, 24, 33, 0.12), 0 2px 8px rgba(20, 24, 33, 0.06);
+        --glow-saffron: 0 0 0 1px rgba(255, 153, 51, 0.2), 0 10px 26px rgba(255, 153, 51, 0.2);
+        --glow-win: 0 0 0 1px rgba(31, 157, 92, 0.2), 0 10px 24px rgba(31, 157, 92, 0.18);
+        --glow-live: 0 0 0 1px rgba(232, 93, 44, 0.22), 0 10px 24px rgba(232, 93, 44, 0.2);
+        --glow-info: 0 0 0 1px rgba(46, 127, 217, 0.2), 0 10px 22px rgba(46, 127, 217, 0.18);
       }
       * {
         box-sizing: border-box;
@@ -69,6 +93,18 @@
           background 0.25s ease,
           color 0.25s ease;
         padding-bottom: 64px;
+        position: relative;
+        overflow-x: hidden;
+      }
+      body::before {
+        content: "";
+        position: fixed;
+        inset: 0;
+        z-index: -1;
+        background:
+          radial-gradient(600px circle at 12% -8%, var(--bg-glow-1), transparent 60%),
+          radial-gradient(520px circle at 105% 18%, var(--bg-glow-2), transparent 55%);
+        pointer-events: none;
       }
       ::selection {
         background: var(--saffron);
@@ -96,10 +132,12 @@
         position: sticky;
         top: 0;
         z-index: 40;
-        background: linear-gradient(180deg, var(--bg) 80%, transparent);
-        backdrop-filter: blur(10px);
+        background: var(--glass-strong);
+        backdrop-filter: blur(20px) saturate(150%);
+        -webkit-backdrop-filter: blur(20px) saturate(150%);
         padding: 14px 16px 8px;
-        border-bottom: 1px solid var(--border);
+        border-bottom: 1px solid var(--glass-border);
+        transition: background 0.25s ease, border-color 0.25s ease;
       }
       .header-row {
         display: flex;
@@ -124,6 +162,7 @@
           #fff 66%,
           var(--indiagreen) 66%
         );
+        box-shadow: 0 0 14px rgba(255, 153, 51, 0.55), 0 0 14px rgba(18, 136, 7, 0.35);
       }
       .brand h1 {
         font-family: "Teko", sans-serif;
@@ -131,16 +170,21 @@
         font-size: 26px;
         line-height: 1;
         margin: 0;
-        letter-spacing: 0.02em;
+        letter-spacing: 0.03em;
         text-transform: uppercase;
+        background: linear-gradient(120deg, var(--text) 40%, var(--saffron-bright) 100%);
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
       }
       .brand small {
         display: block;
         color: var(--muted);
         font-size: 11px;
-        letter-spacing: 0.06em;
+        letter-spacing: 0.08em;
         text-transform: uppercase;
         margin-top: 2px;
+        font-family: "IBM Plex Mono";
       }
       .header-actions {
         display: flex;
@@ -151,21 +195,29 @@
         width: 38px;
         height: 38px;
         border-radius: 50%;
-        border: 1px solid var(--border);
-        background: var(--surface);
+        border: 1px solid var(--glass-border);
+        background: var(--glass);
+        backdrop-filter: blur(10px);
         color: var(--text);
         display: flex;
         align-items: center;
         justify-content: center;
         font-size: 16px;
-        transition: all 0.15s ease;
+        transition: all 0.2s var(--ease);
       }
       .icon-btn:hover {
         background: var(--surface3);
+        border-color: rgba(255, 153, 51, 0.4);
+        transform: translateY(-1px);
+        box-shadow: 0 6px 18px rgba(255, 153, 51, 0.18);
+      }
+      .icon-btn:active {
+        transform: scale(0.94);
       }
       .icon-btn.active {
         border-color: var(--live);
         color: var(--live);
+        box-shadow: var(--glow-live);
       }
 
       /* ===== Live indicator dot (used on match rows) ===== */
@@ -191,8 +243,9 @@
       /* ===== Static per-event live matchup row ===== */
       .event-live-row {
         padding: 10px 16px;
-        background: var(--live-dim);
+        background: linear-gradient(90deg, var(--live-dim), transparent 140%);
         border-top: 1px solid var(--border);
+        box-shadow: inset 0 0 20px rgba(255, 107, 53, 0.08);
         display: flex;
         flex-direction: column;
         gap: 6px;
@@ -224,25 +277,21 @@
       .search-card {
         position: relative;
         margin-top: 16px;
-        background: rgba(255, 255, 255, 0.04);
-        border: 1px solid var(--border);
-        border-radius: 18px;
+        background: var(--glass);
+        border: 1px solid var(--glass-border);
+        border-radius: var(--radius-lg);
         padding: 8px 12px;
         display: flex;
         align-items: center;
         gap: 10px;
-        box-shadow: 0 18px 40px rgba(0, 0, 0, 0.15);
+        box-shadow: var(--shadow-lg);
         width: 100%;
-        /* No backdrop-filter here (deliberately removed) -- this card sits
-           inside header.app-header, which already has its own
-           backdrop-filter: blur(10px). Nesting a second backdrop-filter
-           region is a known source of iOS Safari compositing bugs where an
-           absolutely-positioned child that escapes the inner blur region
-           (the #search-dropdown suggestions list, which extends below this
-           card's own box) lets sibling content (the progress bar / sport
-           filter chips) visibly bleed through it instead of being fully
-           covered -- reported as the filter chips showing through the
-           player-search autocomplete dropdown. */
+        backdrop-filter: blur(18px);
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
+      }
+      .search-card:focus-within {
+        border-color: rgba(255, 153, 51, 0.4);
+        box-shadow: var(--shadow-lg), 0 0 0 3px rgba(255, 153, 51, 0.1);
       }
       .search-card.hidden {
         display: none;
@@ -272,7 +321,7 @@
         font-size: 18px;
       }
       .search-clear {
-        background: var(--surface2);
+        background: var(--surface3);
         border: none;
         color: var(--muted);
         width: 28px;
@@ -281,16 +330,21 @@
         display: none;
         align-items: center;
         justify-content: center;
+        transition: all 0.15s var(--ease);
+      }
+      .search-clear:hover {
+        color: var(--text);
       }
       .search-dropdown {
         position: absolute;
         left: 0;
         right: 0;
         top: calc(100% + 8px);
-        background: var(--surface);
-        border: 1px solid var(--border);
-        border-radius: 18px;
-        box-shadow: 0 24px 60px rgba(0, 0, 0, 0.2);
+        background: var(--glass-strong);
+        backdrop-filter: blur(20px) saturate(150%);
+        border: 1px solid var(--glass-border);
+        border-radius: var(--radius-lg);
+        box-shadow: var(--shadow-lg);
         overflow-y: auto;
         max-height: 320px;
         z-index: 10;
@@ -315,7 +369,7 @@
         transition: background 0.18s ease;
       }
       .search-option:hover {
-        background: var(--surface2);
+        background: rgba(255, 153, 51, 0.08);
       }
       .search-option strong {
         display: block;
@@ -359,21 +413,129 @@
       }
       .progress-track {
         flex: 1;
-        height: 6px;
+        height: 7px;
         border-radius: 4px;
         background: var(--surface2);
+        box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.25);
         overflow: hidden;
+        position: relative;
       }
       .progress-fill {
         height: 100%;
         background: linear-gradient(90deg, var(--saffron), var(--win));
         border-radius: 4px;
-        transition: width 0.4s ease;
+        box-shadow: 0 0 10px rgba(255, 153, 51, 0.45);
+        transition: width 0.5s var(--ease);
+        position: relative;
+        overflow: hidden;
+      }
+      .progress-fill::after {
+        content: "";
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(
+          90deg,
+          transparent,
+          rgba(255, 255, 255, 0.45),
+          transparent
+        );
+        transform: translateX(-100%);
+        animation: shimmer 2.6s ease-in-out infinite;
+      }
+      @keyframes shimmer {
+        100% {
+          transform: translateX(100%);
+        }
       }
       .event-progress-row {
         margin: 0;
         padding: 12px 16px 8px;
         font-size: 11px;
+      }
+
+      /* ===== Standings button + modal ===== */
+      .standings-btn-row {
+        padding: 0 16px 10px;
+      }
+      .standings-btn {
+        font-size: 11.5px;
+        font-weight: 700;
+        padding: 7px 12px;
+        border-radius: var(--radius-sm);
+        border: 1px solid rgba(255, 153, 51, 0.4);
+        background: linear-gradient(135deg, rgba(255, 153, 51, 0.16), rgba(255, 153, 51, 0.05));
+        color: var(--saffron-bright);
+        transition: all 0.2s var(--ease);
+      }
+      .standings-btn:hover {
+        box-shadow: var(--glow-saffron);
+        transform: translateY(-1px);
+      }
+      .standings-btn:active {
+        transform: scale(0.97);
+      }
+      #standings-modal .modal {
+        max-width: 560px;
+      }
+      .standings-group {
+        margin-bottom: 20px;
+      }
+      .standings-group:last-child {
+        margin-bottom: 0;
+      }
+      .standings-group-title {
+        font-family: "IBM Plex Mono";
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--muted);
+        margin-bottom: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+      .standings-group-status {
+        font-size: 10px;
+        text-transform: none;
+        letter-spacing: 0;
+        color: var(--muted-dim);
+      }
+      .standings-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+      .standings-table th,
+      .standings-table td {
+        padding: 7px 8px;
+        text-align: left;
+        border-bottom: 1px solid var(--border);
+      }
+      .standings-table tbody tr {
+        transition: background 0.15s ease;
+      }
+      .standings-table tbody tr:hover {
+        background: rgba(255, 153, 51, 0.05);
+      }
+      .standings-table th {
+        color: var(--muted);
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        font-weight: 600;
+      }
+      .standings-table th.num,
+      .standings-table td.num {
+        text-align: center;
+        width: 15%;
+      }
+      .standings-table tbody tr:last-child td {
+        border-bottom: none;
+      }
+      .standings-empty {
+        color: var(--muted);
+        font-size: 12.5px;
       }
 
       /* ===== Finished-event results summary ===== */
@@ -384,13 +546,14 @@
         gap: 10px;
       }
       .result-card {
-        background: var(--win-dim);
+        background: linear-gradient(135deg, var(--win-dim), rgba(47, 191, 113, 0.03));
         border: 1px solid var(--win);
-        border-radius: 12px;
+        border-radius: var(--radius-sm);
         padding: 14px;
         display: flex;
         flex-direction: column;
         gap: 10px;
+        box-shadow: 0 4px 20px rgba(47, 191, 113, 0.12);
       }
       .result-bracket-label {
         font-family: "IBM Plex Mono";
@@ -431,7 +594,7 @@
       /* ===== Filter chips ===== */
       .chip-row {
         display: flex;
-        gap: 8px;
+        gap: 5px;
         overflow-x: auto;
         margin-top: 14px;
         padding-bottom: 4px;
@@ -442,24 +605,32 @@
       }
       .chip {
         flex: 0 0 auto;
-        padding: 7px 14px;
+        padding: 6px 12px;
         border-radius: 20px;
-        border: 1px solid var(--border);
-        background: var(--surface);
+        border: 1px solid var(--glass-border);
+        background: var(--glass);
+        backdrop-filter: blur(8px);
         color: var(--muted);
-        font-size: 12.5px;
+        font-size: 12px;
         font-weight: 600;
         white-space: nowrap;
-        transition: all 0.15s ease;
+        transition: all 0.2s var(--ease);
+      }
+      .chip:hover {
+        border-color: rgba(255, 153, 51, 0.35);
+        color: var(--text);
+      }
+      .chip:active {
+        transform: scale(0.96);
       }
       .chip.active {
-        background: var(--text);
-        color: var(--bg);
-        border-color: var(--text);
+        background: linear-gradient(135deg, var(--saffron), #ff7a1a);
+        color: #1a1006;
+        border-color: transparent;
+        box-shadow: 0 4px 16px rgba(255, 153, 51, 0.4);
       }
       [data-theme="light"] .chip.active {
-        background: var(--text);
-        color: var(--surface);
+        color: #1a1006;
       }
 
       /* ===== Sections ===== */
@@ -483,12 +654,23 @@
 
       /* ===== Event card ===== */
       .event-card {
-        background: var(--surface);
-        border: 1px solid var(--border);
+        background: var(--glass-strong);
+        backdrop-filter: blur(16px);
+        border: 1px solid var(--glass-border);
         border-radius: var(--radius);
         margin-bottom: 12px;
         overflow: hidden;
         box-shadow: var(--shadow);
+        transition: border-color 0.25s var(--ease), box-shadow 0.25s var(--ease),
+          transform 0.25s var(--ease);
+      }
+      .event-card:hover {
+        border-color: rgba(255, 153, 51, 0.22);
+        box-shadow: var(--shadow-lg);
+      }
+      .event-card.open {
+        border-color: rgba(255, 153, 51, 0.32);
+        box-shadow: var(--shadow-lg), 0 0 0 1px rgba(255, 153, 51, 0.08);
       }
       .event-head {
         padding: 14px 16px;
@@ -498,6 +680,10 @@
         gap: 10px;
         cursor: pointer;
         user-select: none;
+        transition: background 0.15s ease;
+      }
+      .event-head:hover {
+        background: rgba(255, 255, 255, 0.02);
       }
       .event-head-main {
         flex: 1;
@@ -516,6 +702,7 @@
         color: var(--muted);
         font-family: "IBM Plex Mono";
         background: var(--surface3);
+        border: 1px solid var(--glass-border);
         padding: 3px 9px;
         border-radius: 20px;
         flex: 0 0 auto;
@@ -537,6 +724,7 @@
       .status-badge.ready {
         background: var(--win-dim);
         color: var(--win);
+        box-shadow: 0 0 0 1px rgba(47, 191, 113, 0.2);
       }
       .status-badge.pending {
         background: var(--surface3);
@@ -545,9 +733,10 @@
       .status-badge.finished {
         background: var(--win-dim);
         color: var(--win);
+        box-shadow: 0 0 0 1px rgba(47, 191, 113, 0.2);
       }
       .chevron {
-        transition: transform 0.2s ease;
+        transition: transform 0.25s var(--ease);
         color: var(--muted);
         flex: 0 0 auto;
       }
@@ -576,12 +765,14 @@
         padding: 12px 16px;
         border-top: 1px solid var(--border);
         position: relative;
+        transition: background 0.2s ease;
       }
       .match:first-child {
         border-top: none;
       }
       .match.is-live {
-        background: var(--live-dim);
+        background: linear-gradient(90deg, var(--live-dim), rgba(255, 107, 53, 0.04));
+        box-shadow: inset 3px 0 0 var(--live);
       }
       .match-top {
         display: flex;
@@ -598,6 +789,10 @@
         align-items: center;
         flex-wrap: wrap;
       }
+      /* Division-pill/left-border colors are per-division hues computed in
+         JS (matchDivisionHue/divisionColorStyle) and applied inline, since
+         the number of distinct (event, age-band, group) divisions varies
+         per event and can't be enumerated as fixed classes ahead of time. */
       .division-pill {
         display: inline-flex;
         align-items: center;
@@ -609,40 +804,8 @@
         text-transform: uppercase;
         letter-spacing: 0.08em;
       }
-      .match-kids .division-pill {
-        background: rgba(79, 166, 255, 0.14);
-        color: #7cc0ff;
-      }
-      .match-group-a .division-pill {
-        background: rgba(255, 153, 51, 0.16);
-        color: #ffb86b;
-      }
-      .match-group-b .division-pill {
-        background: rgba(33, 221, 125, 0.16);
-        color: #7fe6a6;
-      }
-      .match-mens .division-pill {
-        background: rgba(130, 130, 255, 0.14);
-        color: #b2b8ff;
-      }
-      .match.match-kids {
-        border-left: 3px solid rgba(79, 166, 255, 0.65);
-      }
-      .match.match-group-a {
-        border-left: 3px solid rgba(255, 153, 51, 0.65);
-      }
-      .match.match-group-b {
-        border-left: 3px solid rgba(33, 221, 125, 0.65);
-      }
-      .match.match-mens {
-        border-left: 3px solid rgba(130, 130, 255, 0.65);
-      }
-      .match-round-tag .division-pill {
-        background: rgba(255, 255, 255, 0.08);
-        color: var(--muted);
-      }
       .live-badge {
-        background: var(--live);
+        background: linear-gradient(135deg, var(--live), #ff8c5a);
         color: #fff;
         font-size: 10px;
         font-weight: 700;
@@ -660,7 +823,7 @@
           box-shadow: 0 0 0 0 rgba(255, 107, 53, 0.5);
         }
         50% {
-          box-shadow: 0 0 0 5px rgba(255, 107, 53, 0);
+          box-shadow: 0 0 0 6px rgba(255, 107, 53, 0);
         }
       }
       .live-badge .live-dot {
@@ -675,7 +838,7 @@
       .player {
         flex: 1;
         padding: 10px 12px;
-        border-radius: 10px;
+        border-radius: var(--radius-sm);
         background: var(--surface2);
         font-size: 13.5px;
         font-weight: 600;
@@ -683,7 +846,7 @@
         flex-direction: column;
         gap: 2px;
         border: 1.5px solid transparent;
-        transition: all 0.15s ease;
+        transition: all 0.2s var(--ease);
       }
       .player .age {
         font-weight: 400;
@@ -692,9 +855,10 @@
         font-family: "IBM Plex Mono";
       }
       .player.winner {
-        background: var(--win-dim);
+        background: linear-gradient(135deg, var(--win-dim), rgba(47, 191, 113, 0.04));
         border-color: var(--win);
         color: var(--win);
+        box-shadow: 0 0 16px rgba(47, 191, 113, 0.18);
       }
       .player.winner .age {
         color: var(--win);
@@ -719,9 +883,26 @@
       }
       .player.admin-tap:hover {
         border-color: var(--saffron);
+        box-shadow: 0 0 0 3px rgba(255, 153, 51, 0.1);
+        transform: translateY(-1px);
+      }
+      .player.admin-tap:active {
+        transform: scale(0.98);
+      }
+      .player.view-tap {
+        cursor: pointer;
+      }
+      .player.view-tap:hover {
+        border-color: var(--info);
+        box-shadow: 0 0 0 3px rgba(79, 166, 255, 0.1);
+        transform: translateY(-1px);
+      }
+      .player.view-tap:active {
+        transform: scale(0.98);
       }
       .trophy {
         margin-left: 4px;
+        filter: drop-shadow(0 0 4px rgba(255, 195, 0, 0.6));
       }
 
       .match-actions {
@@ -734,14 +915,24 @@
         font-size: 11px;
         font-weight: 600;
         padding: 6px 10px;
-        border-radius: 8px;
+        border-radius: var(--radius-sm);
         border: 1px solid var(--border);
         background: var(--surface3);
         color: var(--text);
+        transition: all 0.2s var(--ease);
+      }
+      .mini-btn:hover {
+        transform: translateY(-1px);
+      }
+      .mini-btn:active {
+        transform: scale(0.96);
       }
       .mini-btn.start {
         border-color: var(--live);
         color: var(--live);
+      }
+      .mini-btn.start:hover {
+        box-shadow: var(--glow-live);
       }
       .mini-btn.reset {
         color: var(--muted);
@@ -750,9 +941,15 @@
         color: var(--info);
         border-color: var(--info);
       }
+      .mini-btn.edit:hover {
+        box-shadow: var(--glow-info);
+      }
       .mini-btn.danger {
         color: var(--live);
         border-color: var(--live);
+      }
+      .mini-btn.danger:hover {
+        box-shadow: var(--glow-live);
       }
 
       /* ===== Players (pending events) ===== */
@@ -773,9 +970,9 @@
       .pending-note {
         margin: 0 16px 14px;
         padding: 10px 12px;
-        background: var(--surface2);
+        background: linear-gradient(90deg, rgba(255, 153, 51, 0.08), transparent);
         border-left: 3px solid var(--saffron);
-        border-radius: 6px;
+        border-radius: var(--radius-sm);
         font-size: 12px;
         color: var(--muted);
       }
@@ -804,12 +1001,24 @@
         top: calc(100% + 8px);
         right: 0;
         width: 210px;
-        background: var(--surface);
-        border: 1px solid var(--border);
-        border-radius: 14px;
-        box-shadow: var(--shadow);
+        background: var(--glass-strong);
+        backdrop-filter: blur(20px) saturate(150%);
+        border: 1px solid var(--glass-border);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow-lg);
         overflow: hidden;
         z-index: 60;
+        animation: menu-in 0.18s var(--ease);
+      }
+      @keyframes menu-in {
+        from {
+          opacity: 0;
+          transform: translateY(-6px) scale(0.98);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0) scale(1);
+        }
       }
       .menu-dropdown.hidden {
         display: none;
@@ -827,12 +1036,13 @@
         font-size: 13.5px;
         font-weight: 600;
         text-align: left;
+        transition: background 0.15s ease;
       }
       .menu-item:first-child {
         border-top: none;
       }
       .menu-item:hover {
-        background: var(--surface2);
+        background: rgba(255, 153, 51, 0.08);
       }
       .menu-item-icon {
         font-size: 15px;
@@ -857,7 +1067,7 @@
       .pm-row {
         background: var(--surface);
         border: 1px solid var(--border);
-        border-radius: 12px;
+        border-radius: var(--radius-sm);
         padding: 12px 14px;
         margin-bottom: 8px;
         display: flex;
@@ -865,18 +1075,21 @@
         justify-content: space-between;
         gap: 10px;
         cursor: pointer;
-        transition: all 0.15s ease;
+        transition: all 0.2s var(--ease);
       }
       .pm-row:hover {
         border-color: var(--saffron);
+        box-shadow: var(--glow-saffron);
+        transform: translateY(-1px);
       }
       .pm-name {
         font-weight: 600;
         font-size: 14px;
       }
       .pm-player-card {
-        background: var(--surface);
-        border: 1px solid var(--border);
+        background: var(--glass-strong);
+        backdrop-filter: blur(16px);
+        border: 1px solid var(--glass-border);
         border-radius: var(--radius);
         padding: 18px 16px;
         display: flex;
@@ -907,13 +1120,68 @@
       .payment-badge.paid {
         background: var(--win-dim);
         color: var(--win);
+        box-shadow: 0 0 0 1px rgba(47, 191, 113, 0.22);
       }
       .payment-badge.unpaid {
         background: var(--live-dim);
         color: var(--live);
+        box-shadow: 0 0 0 1px rgba(255, 107, 53, 0.22);
       }
       .payment-badge.tappable {
         cursor: pointer;
+        transition: transform 0.2s var(--ease);
+      }
+      .payment-badge.tappable:hover {
+        transform: translateY(-1px) scale(1.03);
+      }
+      .player-stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 10px;
+        margin-top: 10px;
+      }
+      .player-stat-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-sm);
+        padding: 12px;
+        transition: border-color 0.2s ease, transform 0.2s ease;
+      }
+      .player-stat-card:hover {
+        border-color: rgba(255, 153, 51, 0.3);
+        transform: translateY(-1px);
+      }
+      .player-stat-event {
+        font-size: 11.5px;
+        font-weight: 700;
+        color: var(--muted);
+        margin-bottom: 8px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .player-stat-numbers {
+        display: flex;
+        justify-content: space-between;
+        gap: 6px;
+      }
+      .player-stat-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+      .player-stat-value {
+        font-family: "Teko";
+        font-size: 22px;
+        font-weight: 600;
+        line-height: 1;
+      }
+      .player-stat-label {
+        font-size: 9.5px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--muted-dim);
+        margin-top: 2px;
       }
 
       /* ===== Toast ===== */
@@ -930,15 +1198,16 @@
         pointer-events: none;
       }
       .toast {
-        background: var(--surface);
+        background: var(--glass-strong);
+        backdrop-filter: blur(20px) saturate(150%);
         border: 1px solid var(--win);
         border-left: 5px solid var(--win);
-        border-radius: 10px;
+        border-radius: var(--radius-sm);
         padding: 12px 14px;
-        box-shadow: var(--shadow);
+        box-shadow: var(--shadow-lg), var(--glow-win);
         font-size: 13.5px;
         animation:
-          toast-in 0.25s ease,
+          toast-in 0.3s var(--ease),
           toast-out 0.3s ease 1.7s forwards;
         display: flex;
         align-items: center;
@@ -950,6 +1219,7 @@
       .toast.toast-error {
         border-color: var(--live);
         border-left-color: var(--live);
+        box-shadow: var(--shadow-lg), var(--glow-live);
       }
       .toast.toast-error b {
         color: var(--live);
@@ -957,11 +1227,11 @@
       @keyframes toast-in {
         from {
           opacity: 0;
-          transform: translateY(-14px);
+          transform: translateY(-14px) scale(0.96);
         }
         to {
           opacity: 1;
-          transform: translateY(0);
+          transform: translateY(0) scale(1);
         }
       }
       @keyframes toast-out {
@@ -975,7 +1245,7 @@
       .admin-banner {
         background: linear-gradient(90deg, var(--live-dim), transparent);
         border: 1px solid var(--live);
-        border-radius: 10px;
+        border-radius: var(--radius-sm);
         padding: 9px 14px;
         margin-top: 14px;
         font-size: 12px;
@@ -985,6 +1255,7 @@
         gap: 10px;
         color: var(--live);
         font-weight: 600;
+        box-shadow: 0 0 20px rgba(255, 107, 53, 0.1);
       }
       .admin-banner button {
         background: transparent;
@@ -994,6 +1265,10 @@
         border-radius: 7px;
         font-size: 11px;
         font-weight: 700;
+        transition: box-shadow 0.2s ease;
+      }
+      .admin-banner button:hover {
+        box-shadow: var(--glow-live);
       }
 
       .offline-banner {
@@ -1002,7 +1277,7 @@
         gap: 8px;
         background: var(--live-dim);
         border: 1px solid var(--live);
-        border-radius: 10px;
+        border-radius: var(--radius-sm);
         padding: 8px 12px;
         margin-bottom: 10px;
         font-size: 12px;
@@ -1016,33 +1291,55 @@
       .modal-overlay {
         position: fixed;
         inset: 0;
-        background: rgba(0, 0, 0, 0.6);
+        background: rgba(2, 3, 6, 0.66);
         z-index: 300;
         display: none;
         align-items: center;
         justify-content: center;
         padding: 20px;
-        backdrop-filter: blur(3px);
+        backdrop-filter: blur(6px);
       }
       .modal-overlay.show {
         display: flex;
+        animation: overlay-in 0.2s ease;
+      }
+      @keyframes overlay-in {
+        from {
+          opacity: 0;
+        }
+        to {
+          opacity: 1;
+        }
       }
       .modal {
-        background: var(--surface);
-        border: 1px solid var(--border);
-        border-radius: 16px;
+        background: var(--glass-strong);
+        backdrop-filter: blur(24px) saturate(150%);
+        border: 1px solid var(--glass-border);
+        border-radius: var(--radius);
         padding: 24px;
         width: 100%;
         max-width: 380px;
         max-height: calc(100vh - 40px);
         overflow-y: auto;
-        box-shadow: var(--shadow);
+        box-shadow: var(--shadow-lg);
+        animation: modal-in 0.25s var(--ease);
+      }
+      @keyframes modal-in {
+        from {
+          opacity: 0;
+          transform: translateY(10px) scale(0.97);
+        }
+        to {
+          opacity: 1;
+          transform: translateY(0) scale(1);
+        }
       }
       .modal h2 {
         font-family: "Teko";
         font-size: 24px;
         margin: 0 0 4px;
         text-transform: uppercase;
+        letter-spacing: 0.02em;
       }
       .modal p.sub {
         color: var(--muted);
@@ -1064,16 +1361,18 @@
       .field select {
         width: 100%;
         padding: 11px 12px;
-        border-radius: 9px;
+        border-radius: var(--radius-sm);
         border: 1px solid var(--border);
         background: var(--surface2);
         color: var(--text);
         font-size: 14px;
         outline: none;
+        transition: border-color 0.2s ease, box-shadow 0.2s ease;
       }
       .field input:focus,
       .field select:focus {
         border-color: var(--saffron);
+        box-shadow: 0 0 0 3px rgba(255, 153, 51, 0.12);
       }
       .modal-actions {
         display: flex;
@@ -1085,23 +1384,40 @@
       .btn {
         flex: 1;
         padding: 11px;
-        border-radius: 9px;
+        border-radius: var(--radius-sm);
         border: none;
         font-weight: 700;
         font-size: 13.5px;
+        transition: all 0.2s var(--ease);
+      }
+      .btn:active {
+        transform: scale(0.97);
       }
       .btn.primary {
-        background: var(--saffron);
-        color: #161005;
+        background: linear-gradient(135deg, var(--saffron), #ff7a1a);
+        color: #1a1006;
+        box-shadow: 0 4px 16px rgba(255, 153, 51, 0.3);
+      }
+      .btn.primary:hover {
+        box-shadow: 0 6px 22px rgba(255, 153, 51, 0.42);
+        transform: translateY(-1px);
       }
       .btn.ghost {
         background: var(--surface2);
         color: var(--text);
         border: 1px solid var(--border);
       }
+      .btn.ghost:hover {
+        border-color: var(--muted);
+      }
       .btn.danger {
-        background: var(--live);
+        background: linear-gradient(135deg, var(--live), #ff8c5a);
         color: #fff;
+        box-shadow: 0 4px 16px rgba(255, 107, 53, 0.28);
+      }
+      .btn.danger:hover {
+        box-shadow: 0 6px 22px rgba(255, 107, 53, 0.4);
+        transform: translateY(-1px);
       }
       .error-text {
         color: var(--live);
@@ -1118,6 +1434,11 @@
         border: none;
         color: var(--muted);
         font-size: 20px;
+        transition: color 0.15s ease, transform 0.15s ease;
+      }
+      .modal-close:hover {
+        color: var(--text);
+        transform: rotate(90deg);
       }
       .modal {
         position: relative;
@@ -1129,6 +1450,7 @@
         font-size: 11px;
         padding: 30px 16px 10px;
         font-family: "IBM Plex Mono";
+        letter-spacing: 0.03em;
       }
 
       .empty-state {
@@ -1262,6 +1584,13 @@
         <div id="pm-detail" style="display: none"></div>
       </div>
 
+      <div id="player-profile-view" style="display: none">
+        <div class="pm-toolbar">
+          <button class="pm-back-btn" id="player-profile-back">← Back</button>
+        </div>
+        <div id="player-profile-content"></div>
+      </div>
+
       <div id="home-content">
         <div id="events-list"></div>
       </div>
@@ -1321,6 +1650,23 @@
       </div>
     </div>
 
+    <!-- Confirm Winner Modal -->
+    <div class="modal-overlay" id="confirm-winner-modal">
+      <div class="modal">
+        <button class="modal-close" id="confirm-winner-close">✕</button>
+        <h2>Confirm Winner?</h2>
+        <p class="sub" id="confirm-winner-sub"></p>
+        <div class="modal-actions">
+          <button class="btn ghost" id="confirm-winner-no" style="flex: 1">
+            No
+          </button>
+          <button class="btn primary" id="confirm-winner-yes" style="flex: 1">
+            Yes
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Switch Winner Confirm Modal -->
     <div class="modal-overlay" id="switch-winner-modal">
       <div class="modal">
@@ -1352,6 +1698,16 @@
             Delete
           </button>
         </div>
+      </div>
+    </div>
+
+    <!-- Standings Modal -->
+    <div class="modal-overlay" id="standings-modal">
+      <div class="modal">
+        <button class="modal-close" id="standings-close">✕</button>
+        <h2 id="standings-title">Standings</h2>
+        <p class="sub">Group / pool standings — wins, losses, matches played.</p>
+        <div id="standings-content"></div>
       </div>
     </div>
 
@@ -1460,6 +1816,42 @@
           ></div>
           <div class="error-text" id="io-error"></div>
         </div>
+
+        <div
+          class="field"
+          style="
+            margin-top: 18px;
+            border-top: 1px solid var(--border);
+            padding-top: 16px;
+          "
+        >
+          <label>Restore From Backup Snapshot</label>
+          <p style="font-size: 11.5px; color: var(--muted); margin: 0 0 10px">
+            Pick one of the automated backups (taken every few hours by
+            <code>firestore-backup.yml</code>) and replace all current data
+            with it — including payment records, which the file export above
+            doesn't cover.
+          </p>
+          <button class="btn ghost" id="io-snapshot-browse-btn" style="width: 100%">
+            🕐 Browse Snapshots…
+          </button>
+          <select
+            id="io-snapshot-select"
+            style="display: none; width: 100%; margin-top: 8px"
+          ></select>
+          <div
+            id="io-snapshot-summary"
+            style="
+              font-size: 12px;
+              color: var(--info);
+              margin-top: 8px;
+              display: none;
+            "
+          ></div>
+          <div class="error-text" id="io-snapshot-error"></div>
+        </div>
+
+        <div class="error-text" id="io-write-error" style="margin-top: 10px"></div>
 
         <div class="modal-actions">
           <button class="btn ghost" id="io-cancel" style="flex: 1">
@@ -8042,6 +8434,13 @@
         messagingSenderId: "1021213147771",
         appId: "1:1021213147771:web:21cee95064fee9cab9d8de",
       };
+      // Where scripts/backup-firestore.mjs (see .github/workflows/firestore-backup.yml)
+      // commits its JSON snapshots -- the "Restore From Backup Snapshot"
+      // picker in the Import/Export modal lists/fetches directly from here
+      // via GitHub's public, unauthenticated (CORS-enabled) API/raw content
+      // endpoints. Repo is public, so no token is needed or embedded here.
+      const BACKUP_REPO = "AnkitK1993/test-ekta";
+      const BACKUP_BRANCH = "main";
       const fbApp = initializeApp(firebaseConfig);
       const auth = getAuth(fbApp);
       // Each admin is expected to use their own device (single tab). If
@@ -8070,7 +8469,6 @@
         searchCloseMode: false,
         suppressDropdown: false,
         knownStatuses: {}, // matchId -> last seen status, for toast-on-transition detection
-        completedAt: {}, // matchId -> Date.now() when it flipped to completed this session (5s revert window before it sinks to the bottom of its event's pile)
         firstSnapshotDone: false,
         currentEditTarget: null, // {matchId, slotKey}
         playerPayments: {}, // player name -> {name, paid, updatedAt}
@@ -8078,6 +8476,7 @@
         pmSearchQuery: "",
         pmSelectedPlayer: null, // player name, or null when showing the list
         pmPaymentTarget: null, // player name the payment modal is open for
+        viewPlayerName: null, // non-admin: player whose profile (stats + schedule) is open, or null
       };
 
       // Immediate local fallback so the homepage has data before Firestore connects.
@@ -8146,31 +8545,130 @@
         return round;
       }
 
-      function squashDivision(match) {
+      // Display-only: the underlying round-name data (and everything that
+      // parses it -- parseManualSlotName, findGroupStageRound, computeStandings,
+      // stripFinalSuffix, matchCategoryPrefix) keeps saying "Pool" exactly as
+      // stored (e.g. "Pool A"/"Pool B", "41 and above - Pool"), since that's
+      // the round-robin/group-stage naming convention baked into SEED_DATA.
+      // But showing the word "Pool" on a match card reads as "the Pool
+      // (billiards) event" to a user, since Pool is also a real event name --
+      // so anywhere a round name reaches the screen, swap just that word for
+      // "Group" without touching the stored string itself.
+      function formatRoundLabel(round) {
+        return round ? round.replace(/\bPool\b/g, "Group") : round;
+      }
+
+      // Squash keeps its own short, friendly division labels (derived from
+      // match.code, which is more reliable than round text for its
+      // Kids/15-25/Above-25 bracket naming) -- every other event's pill just
+      // shows the round text itself. Color is handled separately, generically,
+      // by matchDivisionHue below, for every event including squash.
+      function squashDivisionLabel(match) {
         const code = match.code || "";
-        if (code.startsWith("U15-")) {
-          return { label: "Kids", className: "match-kids" };
-        }
-        if (code.startsWith("GA-")) {
-          return { label: "Group A", className: "match-group-a" };
-        }
-        if (code.startsWith("GB-")) {
-          return { label: "Group B", className: "match-group-b" };
-        }
-        if (code.startsWith("GC-")) {
-          return { label: "15-25", className: "match-group-b" };
-        }
-        if (code.startsWith("A25-")) {
-          return { label: "Above 25", className: "match-mens" };
-        }
-        return { label: "", className: "" };
+        if (code.startsWith("U15-")) return "Kids";
+        if (code.startsWith("GA-")) return "Group A";
+        if (code.startsWith("GB-")) return "Group B";
+        if (code.startsWith("GC-")) return "15-25";
+        if (code.startsWith("A25-")) return "Above 25";
+        return "";
+      }
+
+      // A match's age-band prefix (matchCategoryPrefix) plus, only while it's
+      // still in its own group/pool stage, the specific group letter -- once
+      // a bracket reaches Semifinal/Final the groups have merged, so those
+      // rounds fall back to just the age-band (no letter), same as squash's
+      // existing A25- semis/final already being a separate color from GA-/GB-.
+      function matchGroupIdentity(match) {
+        const round = match.round || "";
+        const prefix = matchCategoryPrefix(match);
+        if (round.endsWith(" - Group A") || round === "Pool A")
+          return { prefix, group: "A" };
+        if (round.endsWith(" - Group B") || round === "Pool B")
+          return { prefix, group: "B" };
+        return { prefix, group: null };
+      }
+
+      // Every distinct (age-band, group) division that actually occurs in one
+      // event, ordered the same way as the Standings groups (youngest age
+      // band first, Group A before Group B) -- used only to pick a stable,
+      // collision-free color index per division within that event.
+      function eventDivisionOrder(eventId) {
+        const divisions = new Map();
+        state.matches
+          .filter((m) => m.eventId === eventId)
+          .forEach((m) => {
+            const { prefix, group } = matchGroupIdentity(m);
+            const key = prefix + (group ? " Group " + group : "");
+            if (!divisions.has(key)) divisions.set(key, { prefix, group, key });
+          });
+        return [...divisions.values()]
+          .sort(
+            (a, b) =>
+              ageBandSortKey(a.prefix) - ageBandSortKey(b.prefix) ||
+              (a.group || "").localeCompare(b.group || ""),
+          )
+          .map((d) => d.key);
+      }
+
+      // 15 well-spread hues shared by every event's division pills -- at
+      // least as many as the most-divided event ever needs (tt_men peaks at
+      // 12: 3 age bands x {base/merged, Group A, Group B} + Under 26's own
+      // single pool + Above 46's own bracket), so no two divisions in the
+      // same event can ever collide on the same hue regardless of how many
+      // there are. Each event also starts from a different point in this
+      // palette (stride of 2, coprime with the 15-hue palette so all 9
+      // events land on distinct starting hues -- via its fixed position in
+      // EVENT_COLOR_ORDER, not state.events' live order, which Firestore
+      // doesn't guarantee matches SEED_DATA's insertion order, same issue the
+      // sport chips had) so two different events' matches read as visually distinct even side
+      // by side in a mixed list (search results, Players Master schedule).
+      const DIVISION_HUES = [
+        212, 28, 148, 265, 330, 48, 190, 355, 100, 235, 60, 15, 300, 170, 80,
+      ];
+      const EVENT_COLOR_ORDER = [
+        "tt_women",
+        "tt_doubles",
+        "tt_men",
+        "carrom_men",
+        "carrom_women",
+        "carrom_doubles",
+        "pool",
+        "chess",
+        "squash",
+      ];
+      function matchDivisionHue(match) {
+        const order = eventDivisionOrder(match.eventId);
+        const { prefix, group } = matchGroupIdentity(match);
+        const key = prefix + (group ? " Group " + group : "");
+        const idx = Math.max(0, order.indexOf(key));
+        // Stride of 2 is coprime with a 15-hue palette, so all 9 events land
+        // on 9 different starting hues (a stride of 3 only produced 5
+        // distinct starting points across 9 events, colliding every 5th one).
+        const eventOffset = Math.max(0, EVENT_COLOR_ORDER.indexOf(match.eventId)) * 2;
+        return DIVISION_HUES[(idx + eventOffset) % DIVISION_HUES.length];
+      }
+      // Theme-aware pill/border colors for a given hue -- dark theme reads as
+      // bright pastel-on-dark (same formula the old hardcoded squash colors
+      // used), light theme flips to a darker, more saturated tone so the
+      // pill text stays legible on a white background.
+      function divisionColorStyle(hue) {
+        const dark = state.theme !== "light";
+        return {
+          bg: `hsla(${hue}, 85%, ${dark ? 60 : 42}%, ${dark ? 0.16 : 0.14})`,
+          text: `hsl(${hue}, ${dark ? 90 : 80}%, ${dark ? 74 : 32}%)`,
+          border: `hsla(${hue}, 85%, ${dark ? 60 : 42}%, 0.6)`,
+        };
       }
 
       function matchDivision(m) {
-        if (m.eventId === "squash") return squashDivision(m);
-        return m.round
-          ? { label: m.round, className: "match-round-tag" }
-          : { label: "", className: "" };
+        const label =
+          m.eventId === "squash"
+            ? squashDivisionLabel(m)
+            : m.round
+              ? formatRoundLabel(m.round)
+              : "";
+        if (!label) return { label: "", style: null };
+        return { label, style: divisionColorStyle(matchDivisionHue(m)) };
       }
 
       // Age-band/bracket key for a match, e.g. "Above 46", "Above 25 Bracket",
@@ -8319,6 +8817,110 @@
         return ranked;
       }
 
+      // Age-band prefix of a group-stage round name itself (e.g. "Under 46"
+      // out of "Under 46 - Group A", "" out of "Pool A"/"Pool B"/"Pool" for
+      // the events with no age split) -- same suffix list as
+      // matchCategoryPrefix, just applied directly to a round string instead
+      // of a match's own round.
+      function ageBandPrefixFromRound(round) {
+        const suffixes = [" - Group A", " - Group B", " - Pool", " - Semifinal", " - Final"];
+        for (const suf of suffixes) {
+          if (round.endsWith(suf)) return round.slice(0, -suf.length);
+        }
+        return "";
+      }
+      // Turns an age-band prefix into a number to sort ascending by age.
+      // "Under N" -> just below N (so it lands before an "N to M" band that
+      // starts at the same N); "Above N"/"N and above" -> just past N (so it
+      // lands after an "Under N" band with the same N, e.g. carrom_men's
+      // "Under 46" then "Above 46"); anything else ("N to M", "N-M Bracket")
+      // uses its first number as-is (its lower bound).
+      function ageBandSortKey(prefix) {
+        if (!prefix) return 0;
+        const n = prefix.match(/\d+/);
+        if (!n) return 0;
+        if (/^under\b/i.test(prefix)) return +n[0] - 0.5;
+        if (/above|and above/i.test(prefix)) return +n[0] + 0.5;
+        return +n[0];
+      }
+
+      // Every round-robin/group/pool round that feeds a manual slot somewhere
+      // in this event, discovered the same way resolveSlot finds them (via
+      // parseManualSlotName + stripFinalSuffix + findGroupStageRound) rather
+      // than hardcoding a naming convention — so it stays correct across the
+      // 4 different manual-slot-name templates and the tt_women "Pool A/B"
+      // exception. Returns unique round names, ordered youngest age band
+      // first, then alphabetically within the same band (Group A before
+      // Group B) — for driving the Standings view.
+      function eventGroupStageRounds(eventId) {
+        const rounds = new Map();
+        state.matches
+          .filter((m) => m.eventId === eventId)
+          .forEach((m) => {
+            ["A", "B"].forEach((slotKey) => {
+              const slot = m["player" + slotKey];
+              if (!slot || slot.type !== "manual") return;
+              const parsed = parseManualSlotName(slot.name);
+              if (!parsed) return;
+              const prefix = stripFinalSuffix(m.round);
+              if (prefix === null) return;
+              const round = findGroupStageRound(eventId, prefix, parsed.group);
+              if (!round || rounds.has(round)) return;
+              rounds.set(round, round);
+            });
+          });
+        return [...rounds.keys()].sort((a, b) => {
+          const keyA = ageBandSortKey(ageBandPrefixFromRound(a));
+          const keyB = ageBandSortKey(ageBandPrefixFromRound(b));
+          return keyA - keyB || a.localeCompare(b);
+        });
+      }
+
+      // Full standings table for one round-robin/group round — every player
+      // who has appeared in the round, with matches played/won/lost so far,
+      // regardless of whether the round is fully complete yet (unlike
+      // computeStandings, which only returns a ranking once the round is
+      // 100% played). Sorted by wins desc, then losses asc, then name.
+      function computeGroupTable(eventId, round) {
+        const roundMatches = state.matches.filter(
+          (m) => m.eventId === eventId && m.round === round,
+        );
+        const players = new Map();
+        roundMatches.forEach((m) => {
+          const a = resolveSlot(m, "A"),
+            b = resolveSlot(m, "B");
+          [a, b].forEach((p) => {
+            if (!p.tbd && !players.has(p.name))
+              players.set(p.name, {
+                name: p.name,
+                age: p.age,
+                played: 0,
+                won: 0,
+                lost: 0,
+              });
+          });
+          if (m.status !== "completed") return;
+          const winner = m.winnerSlot === "A" ? a : b;
+          const loser = m.winnerSlot === "A" ? b : a;
+          const w = players.get(winner.name),
+            l = players.get(loser.name);
+          if (w) {
+            w.played++;
+            w.won++;
+          }
+          if (l) {
+            l.played++;
+            l.lost++;
+          }
+        });
+        // Ranked by wins desc, losses asc, alphabetically as the final
+        // tiebreak -- which is also what this defaults to before any
+        // matches are played (everyone at 0-0, so purely alphabetical).
+        return [...players.values()].sort(
+          (x, y) => y.won - x.won || x.lost - y.lost || x.name.localeCompare(y.name),
+        );
+      }
+
       /* Recursively resolve a slot to a display object {name, age, isTbd, isWinnerOf} */
       function resolveSlot(match, slotKey) {
         const override = match["override" + slotKey];
@@ -8353,6 +8955,21 @@
           return { name: "Winner of " + slot.ref, age: null, tbd: true };
         }
         return { name: "TBD", age: null, tbd: true };
+      }
+
+      // A match's own `status`/`winnerSlot` fields are frozen at the moment
+      // it's completed — but a `manual` (group-standings) or `placeholder`
+      // slot it depends on can become unresolved again afterwards (e.g. an
+      // admin resets a group-stage match, which un-resolves "Group A 1st").
+      // resolveSlot already reacts correctly to that (the slot goes back to
+      // showing "Group A 1st" / "Winner of M3"), but the *match*'s stored
+      // completed/winner status doesn't auto-revert with it, which would
+      // otherwise show a TBD player wearing the winner trophy and get
+      // counted as a played match. Treat a match as "really" completed only
+      // when both its slots currently resolve to an actual player.
+      function isMatchResolvedComplete(m) {
+        if (m.status !== "completed") return false;
+        return !resolveSlot(m, "A").tbd && !resolveSlot(m, "B").tbd;
       }
 
       /* ===================== DATA SYNC ===================== */
@@ -8415,17 +9032,8 @@
                   ) {
                     const ev = eventById(m.eventId);
                     toast(
-                      `🏆 <span><b>${m.winnerName}</b> defeated ${m.loserName || "opponent"}<br><span style="color:var(--muted);font-size:11px;">${ev ? ev.name : m.eventId} — ${m.round}</span></span>`,
+                      `🏆 <span><b>${m.winnerName}</b> defeated ${m.loserName || "opponent"}<br><span style="color:var(--muted);font-size:11px;">${ev ? ev.name : m.eventId} — ${formatRoundLabel(m.round)}</span></span>`,
                     );
-                    // hold at its normal spot for 5s (revert window) before it
-                    // sinks to the bottom of its event's match pile
-                    state.completedAt[key] = Date.now();
-                    setTimeout(() => render(), 5000);
-                  } else if (
-                    prevStatus === "completed" &&
-                    m.status !== "completed"
-                  ) {
-                    delete state.completedAt[key];
                   }
                 }
               });
@@ -8664,14 +9272,30 @@
 
       /* ===================== IMPORT / EXPORT ===================== */
       let pendingImportData = null;
+      let pendingImportSource = null; // "file" | "snapshot" -- just for confirm/button wording
+      let snapshotOptions = []; // [{name, download_url, exportedAt}] from the last Browse Snapshots fetch
 
-      document.getElementById("menu-io-item").addEventListener("click", () => {
-        hideMenu();
+      function resetIoModalState() {
         pendingImportData = null;
+        pendingImportSource = null;
         document.getElementById("io-file-summary").style.display = "none";
         document.getElementById("io-override-btn").style.display = "none";
         document.getElementById("io-error").style.display = "none";
         document.getElementById("io-file-input").value = "";
+        document.getElementById("io-snapshot-summary").style.display = "none";
+        document.getElementById("io-snapshot-error").style.display = "none";
+        document.getElementById("io-write-error").style.display = "none";
+        document.getElementById("io-snapshot-select").style.display = "none";
+        document.getElementById("io-snapshot-select").innerHTML = "";
+        document.getElementById("io-snapshot-browse-btn").style.display = "block";
+        document.getElementById("io-snapshot-browse-btn").textContent =
+          "🕐 Browse Snapshots…";
+        snapshotOptions = [];
+      }
+
+      document.getElementById("menu-io-item").addEventListener("click", () => {
+        hideMenu();
+        resetIoModalState();
         document.getElementById("io-modal").classList.add("show");
       });
       document
@@ -8759,7 +9383,12 @@
           errEl.style.display = "none";
           summaryEl.style.display = "none";
           overrideBtn.style.display = "none";
+          // Choosing a file supersedes any pending snapshot selection --
+          // only one source can be "loaded and ready to override with" at a time.
+          document.getElementById("io-snapshot-summary").style.display = "none";
+          document.getElementById("io-snapshot-select").value = "";
           pendingImportData = null;
+          pendingImportSource = null;
           if (!file) return;
 
           const reader = new FileReader();
@@ -8818,12 +9447,14 @@
                 matches,
                 pendingPlayers,
               };
+              pendingImportSource = "file";
               const pendingCount = Object.values(pendingPlayers).reduce(
                 (s, arr) => s + (arr ? arr.length : 0),
                 0,
               );
               summaryEl.innerHTML = `<b>${file.name}</b><br>${events.length} events · ${matches.length} matches · ${pendingCount} pending players`;
               summaryEl.style.display = "block";
+              overrideBtn.textContent = "Override Data";
               overrideBtn.style.display = "block";
             } catch (err) {
               errEl.textContent = "Could not read file: " + err.message;
@@ -8832,6 +9463,117 @@
           };
           reader.readAsArrayBuffer(file);
         });
+
+      /* ===================== RESTORE FROM BACKUP SNAPSHOT ===================== */
+      // Filenames are "backup-<ISO-with-dashes>.json" (see
+      // scripts/backup-firestore.mjs) -- turn one back into a readable
+      // local date/time for the dropdown.
+      function formatSnapshotLabel(filename) {
+        const m = filename.match(/^backup-(.+)\.json$/);
+        if (!m) return filename;
+        const iso = m[1].replace(
+          /^(\d{4})-(\d{2})-(\d{2})T(\d{2})-(\d{2})-(\d{2})-(\d{3})Z$/,
+          "$1-$2-$3T$4:$5:$6.$7Z",
+        );
+        const d = new Date(iso);
+        if (isNaN(d)) return filename;
+        return d.toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" });
+      }
+
+      document
+        .getElementById("io-snapshot-browse-btn")
+        .addEventListener("click", async () => {
+          const btn = document.getElementById("io-snapshot-browse-btn");
+          const select = document.getElementById("io-snapshot-select");
+          const errEl = document.getElementById("io-snapshot-error");
+          errEl.style.display = "none";
+          btn.textContent = "Loading…";
+          btn.disabled = true;
+          try {
+            const res = await fetch(
+              `https://api.github.com/repos/${BACKUP_REPO}/contents/data-backups?ref=${BACKUP_BRANCH}`,
+            );
+            if (!res.ok) {
+              throw new Error(
+                res.status === 404
+                  ? "No backups found yet — the scheduled workflow hasn't run."
+                  : `GitHub returned ${res.status}`,
+              );
+            }
+            const entries = await res.json();
+            snapshotOptions = entries
+              .filter((e) => e.type === "file" && e.name.endsWith(".json"))
+              .sort((a, b) => b.name.localeCompare(a.name)); // ISO names sort chronologically -- newest first
+            if (!snapshotOptions.length) {
+              throw new Error("No backup snapshots found in data-backups/ yet.");
+            }
+            select.innerHTML = snapshotOptions
+              .map(
+                (e, i) =>
+                  `<option value="${i}">${escapeHtml(formatSnapshotLabel(e.name))}</option>`,
+              )
+              .join("");
+            select.style.display = "block";
+            btn.style.display = "none";
+            select.value = "0";
+            await loadSelectedSnapshot();
+          } catch (err) {
+            errEl.textContent = "Couldn't load snapshot list: " + err.message;
+            errEl.style.display = "block";
+            btn.textContent = "🕐 Browse Snapshots…";
+          } finally {
+            btn.disabled = false;
+          }
+        });
+
+      async function loadSelectedSnapshot() {
+        const select = document.getElementById("io-snapshot-select");
+        const summaryEl = document.getElementById("io-snapshot-summary");
+        const errEl = document.getElementById("io-snapshot-error");
+        const overrideBtn = document.getElementById("io-override-btn");
+        const entry = snapshotOptions[+select.value];
+        if (!entry) return;
+        errEl.style.display = "none";
+        summaryEl.textContent = "Loading snapshot…";
+        summaryEl.style.display = "block";
+        // Choosing a snapshot supersedes any pending file selection.
+        document.getElementById("io-file-summary").style.display = "none";
+        document.getElementById("io-file-input").value = "";
+        overrideBtn.style.display = "none";
+        try {
+          const res = await fetch(entry.download_url);
+          if (!res.ok) throw new Error(`GitHub returned ${res.status}`);
+          const backup = await res.json();
+          const pendingPlayers = {};
+          (backup.pendingPlayers || []).forEach((row) => {
+            if (row && row.id) pendingPlayers[row.id] = row.players || [];
+          });
+          pendingImportData = {
+            events: backup.events || [],
+            matches: backup.matches || [],
+            pendingPlayers,
+            playerPayments: backup.playerPayments || [],
+          };
+          pendingImportSource = "snapshot";
+          const pendingCount = Object.values(pendingPlayers).reduce(
+            (s, arr) => s + (arr ? arr.length : 0),
+            0,
+          );
+          summaryEl.innerHTML = `<b>${escapeHtml(formatSnapshotLabel(entry.name))}</b><br>${pendingImportData.events.length} events · ${pendingImportData.matches.length} matches · ${pendingCount} pending players · ${pendingImportData.playerPayments.length} payment records`;
+          overrideBtn.textContent = "Override With Snapshot";
+          overrideBtn.style.display = "block";
+        } catch (err) {
+          pendingImportData = null;
+          pendingImportSource = null;
+          errEl.textContent = "Couldn't load that snapshot: " + err.message;
+          errEl.style.display = "block";
+          summaryEl.style.display = "none";
+        }
+      }
+
+      document
+        .getElementById("io-snapshot-select")
+        .addEventListener("change", loadSelectedSnapshot);
 
       function chunkArray(arr, size) {
         const out = [];
@@ -8844,10 +9586,17 @@
         .getElementById("io-override-btn")
         .addEventListener("click", async () => {
           if (!pendingImportData) return;
-          const errEl = document.getElementById("io-error");
+          const errEl = document.getElementById("io-write-error");
           errEl.style.display = "none";
+
+          // playerPayments is only ever present on a snapshot restore (the
+          // .xlsx file import never carries it), so it's the one collection
+          // that's conditionally included in both the wording and the writes.
+          const parts = ["events", "matches", "pending players"];
+          if (pendingImportData.playerPayments) parts.push("payment records");
+          const sourceNoun = pendingImportSource === "snapshot" ? "snapshot" : "file";
           const ok = confirm(
-            "This will permanently replace ALL current events, matches and pending players with the contents of this file. Continue?",
+            `This will permanently replace ALL current ${parts.join(", ")} with the contents of this ${sourceNoun}. Continue?`,
           );
           if (!ok) return;
 
@@ -8857,8 +9606,12 @@
           btn.disabled = true;
 
           try {
-            // 1. Delete all existing docs in the three collections
-            for (const colName of ["events", "matches", "pendingPlayers"]) {
+            const collectionsToReplace = ["events", "matches", "pendingPlayers"];
+            if (pendingImportData.playerPayments)
+              collectionsToReplace.push("playerPayments");
+
+            // 1. Delete all existing docs in the collections being replaced
+            for (const colName of collectionsToReplace) {
               const snap = await getDocs(collection(db, colName));
               const refs = snap.docs.map((d) => d.ref);
               for (const group of chunkArray(refs, 450)) {
@@ -8891,9 +9644,20 @@
                 await b.commit();
               }
             }
+            if (pendingImportData.playerPayments) {
+              for (const group of chunkArray(pendingImportData.playerPayments, 450)) {
+                const b = writeBatch(db);
+                group.forEach((p) => b.set(doc(db, "playerPayments", p.id), p));
+                await b.commit();
+              }
+            }
 
             document.getElementById("io-modal").classList.remove("show");
-            toast("✅ <b>Data overridden from file</b>");
+            toast(
+              pendingImportSource === "snapshot"
+                ? "✅ <b>Data restored from snapshot</b>"
+                : "✅ <b>Data overridden from file</b>",
+            );
           } catch (e) {
             console.error(e);
             errEl.textContent = "Override failed: " + e.message;
@@ -8928,6 +9692,38 @@
           toast("⚠️ Couldn't save result — please try again", "error");
         });
       }
+
+      // Marking the winner of an in-progress/upcoming match (not switching
+      // an already-completed one -- that's openSwitchWinnerModal below)
+      // requires a Yes/No confirm first. Once confirmed, the match is
+      // completed immediately and sinks straight to the bottom of its
+      // event's list on the next render -- no revert-window delay.
+      let pendingConfirmWinner = null; // {match, slotKey} awaiting confirm in confirm-winner-modal
+      function openConfirmWinnerModal(match, slotKey) {
+        const candidate = resolveSlot(match, slotKey);
+        pendingConfirmWinner = { match, slotKey };
+        const label = match.matchNumber ? `Match ${match.matchNumber}` : match.code;
+        document.getElementById("confirm-winner-sub").textContent =
+          `Mark ${candidate.name} as the winner of ${label}?`;
+        document.getElementById("confirm-winner-modal").classList.add("show");
+      }
+      function closeConfirmWinnerModal() {
+        document.getElementById("confirm-winner-modal").classList.remove("show");
+        pendingConfirmWinner = null;
+      }
+      document
+        .getElementById("confirm-winner-close")
+        .addEventListener("click", closeConfirmWinnerModal);
+      document
+        .getElementById("confirm-winner-no")
+        .addEventListener("click", closeConfirmWinnerModal);
+      document
+        .getElementById("confirm-winner-yes")
+        .addEventListener("click", () => {
+          const pending = pendingConfirmWinner;
+          closeConfirmWinnerModal();
+          if (pending) confirmWinner(pending.match, pending.slotKey);
+        });
 
       let pendingSwitch = null; // {match, slotKey} awaiting confirm in switch-winner-modal
       function openSwitchWinnerModal(match, newSlotKey) {
@@ -9012,6 +9808,59 @@
             toast("⚠️ Couldn't delete match — please try again", "error");
           });
         });
+
+      /* ===================== STANDINGS ===================== */
+      function openStandingsModal(eventId) {
+        const ev = eventById(eventId);
+        const rounds = eventGroupStageRounds(eventId);
+        document.getElementById("standings-title").textContent = ev
+          ? `${ev.name} — Standings`
+          : "Standings";
+        const content = document.getElementById("standings-content");
+        content.innerHTML = rounds.length
+          ? rounds
+              .map((round) => {
+                const rows = computeGroupTable(eventId, round);
+                const complete = computeStandings(eventId, round) !== null;
+                if (!rows.length) return "";
+                return `
+        <div class="standings-group">
+          <div class="standings-group-title">
+            <span>${formatRoundLabel(round)}</span>
+            <span class="standings-group-status">${complete ? "Complete" : "In progress"}</span>
+          </div>
+          <table class="standings-table">
+            <thead>
+              <tr>
+                <th>Player</th>
+                <th class="num">P</th>
+                <th class="num">W</th>
+                <th class="num">L</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows
+                .map(
+                  (r) => `
+              <tr>
+                <td>${r.name}</td>
+                <td class="num">${r.played}</td>
+                <td class="num">${r.won}</td>
+                <td class="num">${r.lost}</td>
+              </tr>`,
+                )
+                .join("")}
+            </tbody>
+          </table>
+        </div>`;
+              })
+              .join("")
+          : `<div class="standings-empty">No group/pool standings for this event.</div>`;
+        document.getElementById("standings-modal").classList.add("show");
+      }
+      document.getElementById("standings-close").addEventListener("click", () => {
+        document.getElementById("standings-modal").classList.remove("show");
+      });
 
       /* ===================== EDIT SLOT ===================== */
       let editNameCandidates = []; // scoped (event+category) player pool for the open edit modal
@@ -9135,7 +9984,7 @@
           const ev = eventById(m.eventId);
           return ev && ev.status === "ready";
         });
-        const done = relevant.filter((m) => m.status === "completed").length;
+        const done = relevant.filter(isMatchResolvedComplete).length;
         const total = relevant.length;
         document.getElementById("progress-label").textContent =
           `${done} / ${total} matches played`;
@@ -9146,7 +9995,23 @@
 
       /* ===================== RENDER: FILTER CHIPS ===================== */
       function renderChips() {
-        const sports = ["All", ...new Set(state.events.map((e) => e.sport))];
+        // Fixed display order for the sport chips, matching SEED_DATA's
+        // original event order (TT, Carrom, Pool, Chess, Squash). Firestore
+        // doesn't guarantee `collection(db,"events")` comes back in write
+        // order -- in practice it lands roughly alphabetical by doc ID,
+        // which pushed the "TT" chip to the very end (past "Squash") and
+        // off-screen. Any sport not in this list (shouldn't happen) is
+        // appended at the end rather than dropped. Scoped inside the
+        // function (not a module-level const) since render() can fire from
+        // the auth-state callback before a top-level const below this point
+        // in the module would have finished initializing.
+        const SPORT_ORDER = ["TT", "Carrom", "Pool", "Chess", "Squash"];
+        const present = new Set(state.events.map((e) => e.sport));
+        const orderedSports = SPORT_ORDER.filter((s) => present.has(s));
+        present.forEach((s) => {
+          if (!orderedSports.includes(s)) orderedSports.push(s);
+        });
+        const sports = ["All", ...orderedSports];
         const sportWrap = document.getElementById("sport-chips");
         sportWrap.innerHTML = sports
           .map(
@@ -9167,7 +10032,11 @@
         const a = resolveSlot(m, "A"),
           b = resolveSlot(m, "B");
         const isLive = m.status === "live";
-        const isDone = m.status === "completed";
+        // Not just m.status === "completed": a manual/placeholder slot this
+        // match's winner came from can un-resolve later (e.g. an admin
+        // resets the group-stage match that decided "Group A 1st"), which
+        // must not leave this match showing a TBD player wearing the trophy.
+        const isDone = m.status === "completed" && !a.tbd && !b.tbd;
         const aWin = isDone && m.winnerSlot === "A";
         const bWin = isDone && m.winnerSlot === "B";
 
@@ -9178,10 +10047,14 @@
           if (resolved.tbd) classes.push("tbd");
           const canTap = state.isAdmin && !resolved.tbd;
           if (canTap) classes.push("admin-tap");
+          // Non-admin: tapping a resolved player's name opens their profile
+          // (stats + schedule) instead of the admin winner-marking gesture.
+          const canView = !state.isAdmin && !resolved.tbd;
+          if (canView) classes.push("view-tap");
           const editBtn = state.isAdmin
             ? `<span style="font-size:10px;color:var(--info);margin-left:4px;" data-edit="${slotKey}">✎ edit</span>`
             : "";
-          return `<div class="${classes.join(" ")}" ${canTap ? `data-tapwinner="${slotKey}"` : ""}>
+          return `<div class="${classes.join(" ")}" ${canTap ? `data-tapwinner="${slotKey}"` : ""} ${canView ? `data-viewplayer="${escapeHtml(resolved.name)}"` : ""}>
       <span>${resolved.name}${isWinner ? '<span class="trophy">🏆</span>' : ""}</span>
       ${resolved.age ? `<span class="age">Age ${resolved.age}</span>` : ""}
       ${editBtn}
@@ -9208,13 +10081,16 @@
 
         const displayCode = m.matchNumber ? `Match ${m.matchNumber}` : m.code;
         const division = matchDivision(m);
+        const matchBorderStyle = division.style
+          ? ` style="border-left:3px solid ${division.style.border};"`
+          : "";
         const venueText =
           m.eventId === "squash" ? "" : m.venue ? ` · ${m.venue}` : "";
         return `
-  <div class="match ${isLive ? "is-live" : ""} ${division.className}" data-matchid="${m.matchId}">
+  <div class="match ${isLive ? "is-live" : ""}"${matchBorderStyle} data-matchid="${m.matchId}">
     <div class="match-top">
       <span class="match-info">
-        ${division.label ? `<span class="division-pill ${division.className}">${division.label}</span>` : ""}
+        ${division.label ? `<span class="division-pill" style="background:${division.style.bg};color:${division.style.text};">${division.label}</span>` : ""}
         ${displayCode || ""}${m.day ? ` · ${m.day}` : ""}${m.time ? `, ${m.time}` : ""}${venueText}
       </span>
       ${isLive ? '<span class="live-badge"><span class="live-dot"></span>LIVE</span>' : ""}
@@ -9243,7 +10119,7 @@
               if (isCurrentWinner) resetMatch(match);
               else if (match.status === "completed")
                 openSwitchWinnerModal(match, slotKey);
-              else confirmWinner(match, slotKey);
+              else openConfirmWinnerModal(match, slotKey);
             });
           });
           matchEl.querySelectorAll("[data-edit]").forEach((editEl) => {
@@ -9261,6 +10137,13 @@
               if (action === "live") setMatchStatus(match, "live");
               else if (action === "upcoming") setMatchStatus(match, "upcoming");
               else if (action === "deletematch") deleteMatchWithConfirm(match);
+            });
+          });
+          matchEl.querySelectorAll("[data-viewplayer]").forEach((p) => {
+            p.addEventListener("click", (e) => {
+              e.stopPropagation();
+              state.viewPlayerName = p.dataset.viewplayer;
+              render();
             });
           });
         });
@@ -9308,19 +10191,12 @@
         return an.localeCompare(bn);
       }
 
-      // A just-completed match stays put in its normal chronological spot for
-      // 5s (so a mis-tap can be reverted without hunting for it), then sinks
-      // to the bottom of its event's list. Matches completed before this
-      // session (no completedAt entry) sink immediately.
-      function isHeldCompleted(m) {
-        if (m.status !== "completed") return false;
-        const at = state.completedAt[m.matchId || m.id];
-        if (!at) return false;
-        return Date.now() - at < 5000;
-      }
+      // A completed match sinks straight to the bottom of its event's list
+      // (the admin already confirmed the winner via the Yes/No modal before
+      // it got marked completed, so there's no separate revert window here).
       function compareForEventPile(a, b) {
-        const aBottom = a.status === "completed" && !isHeldCompleted(a);
-        const bBottom = b.status === "completed" && !isHeldCompleted(b);
+        const aBottom = isMatchResolvedComplete(a);
+        const bBottom = isMatchResolvedComplete(b);
         if (aBottom !== bBottom) return aBottom ? 1 : -1;
         return compareMatches(a, b);
       }
@@ -9347,7 +10223,7 @@
       }
       function eventResultsSummaryHtml(evMatches) {
         const finals = evMatches
-          .filter((m) => m.status === "completed" && isFinalRound(m.round))
+          .filter((m) => isMatchResolvedComplete(m) && isFinalRound(m.round))
           .sort(compareMatches);
         if (!finals.length) return "";
         return `<div class="event-results-summary">${finals
@@ -9382,10 +10258,10 @@
         if (ev.status === "pending") return 1;
         const evMatches = state.matches.filter((m) => m.eventId === ev.id);
         if (!evMatches.length) return 1;
-        const done = evMatches.filter((m) => m.status === "completed").length;
+        const done = evMatches.filter(isMatchResolvedComplete).length;
         if (done === evMatches.length) return 2;
         const started = evMatches.some(
-          (m) => m.status === "live" || m.status === "completed",
+          (m) => m.status === "live" || isMatchResolvedComplete(m),
         );
         return started ? 0 : 1;
       }
@@ -9429,7 +10305,7 @@
                 .filter((m) => m.eventId === ev.id)
                 .sort(compareForEventPile);
               total = evMatches.length;
-              done = evMatches.filter((m) => m.status === "completed").length;
+              done = evMatches.filter(isMatchResolvedComplete).length;
               const progressHtml = `
         <div class="progress-row event-progress-row">
           <span>${done} / ${total} matches played</span>
@@ -9438,9 +10314,13 @@
               const resultsSummaryHtml = isFinished
                 ? eventResultsSummaryHtml(evMatches)
                 : "";
+              const standingsBtnHtml = eventGroupStageRounds(ev.id).length
+                ? `<div class="standings-btn-row"><button type="button" class="standings-btn" data-standings="${ev.id}">🏆 Standings</button></div>`
+                : "";
               bodyHtml =
                 resultsSummaryHtml +
                 progressHtml +
+                standingsBtnHtml +
                 evMatches.map(renderMatchRow).join("");
 
               const liveMatches = evMatches.filter((m) => m.status === "live");
@@ -9491,6 +10371,12 @@
             render();
           });
         });
+        wrap.querySelectorAll("[data-standings]").forEach((btn) => {
+          btn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            openStandingsModal(btn.dataset.standings);
+          });
+        });
         attachMatchHandlers(wrap);
       }
 
@@ -9538,10 +10424,9 @@
         html += matched
           .map((m) => {
             const ev = eventById(m.eventId);
-            const roundText =
-              ev && ev.id === "squash"
-                ? formatSquashRoundTag(m.round)
-                : m.round;
+            const roundText = formatRoundLabel(
+              ev && ev.id === "squash" ? formatSquashRoundTag(m.round) : m.round,
+            );
             return `<div class="event-card open" style="margin-bottom:10px;"><div class="event-body" style="border-top:none;">
       <div class="round-label">${ev ? ev.name : m.eventId} · ${roundText}</div>
       ${renderMatchRow(m)}
@@ -9606,6 +10491,86 @@
         return [...names].sort((a, b) => a.localeCompare(b));
       }
 
+      // Per-event win/loss/played record for one player, counting only
+      // matches that are genuinely decided (see isMatchResolvedComplete --
+      // a match whose winner came from a group-standings/placeholder slot
+      // that later un-resolved must not count here either).
+      function computePlayerEventStats(name) {
+        const byEvent = new Map();
+        state.matches.forEach((m) => {
+          if (!isMatchResolvedComplete(m)) return;
+          const a = resolveSlot(m, "A"),
+            b = resolveSlot(m, "B");
+          let mySlot = null;
+          if (a.name === name) mySlot = "A";
+          else if (b.name === name) mySlot = "B";
+          if (!mySlot) return;
+          if (!byEvent.has(m.eventId)) {
+            const ev = eventById(m.eventId);
+            byEvent.set(m.eventId, {
+              eventName: ev ? ev.name : m.eventId,
+              played: 0,
+              won: 0,
+              lost: 0,
+            });
+          }
+          const rec = byEvent.get(m.eventId);
+          rec.played++;
+          if (m.winnerSlot === mySlot) rec.won++;
+          else rec.lost++;
+        });
+        return [...byEvent.values()].sort((x, y) =>
+          x.eventName.localeCompare(y.eventName),
+        );
+      }
+
+      function playerStatsHtml(name) {
+        const stats = computePlayerEventStats(name);
+        if (!stats.length) return "";
+        return `
+    <div class="section-title" style="margin-top:18px;">Stats<div class="rule"></div></div>
+    <div class="player-stats-grid">
+      ${stats
+        .map(
+          (s) => `
+      <div class="player-stat-card">
+        <div class="player-stat-event">${escapeHtml(s.eventName)}</div>
+        <div class="player-stat-numbers">
+          <div class="player-stat-item"><span class="player-stat-value">${s.played}</span><span class="player-stat-label">Played</span></div>
+          <div class="player-stat-item"><span class="player-stat-value">${s.won}</span><span class="player-stat-label">Won</span></div>
+          <div class="player-stat-item"><span class="player-stat-value">${s.lost}</span><span class="player-stat-label">Lost</span></div>
+        </div>
+      </div>`,
+        )
+        .join("")}
+    </div>`;
+      }
+
+      function playerScheduleHtml(name) {
+        const playerMatches = state.matches
+          .filter((m) => {
+            const a = resolveSlot(m, "A").name;
+            const b = resolveSlot(m, "B").name;
+            return a === name || b === name;
+          })
+          .sort(compareMatches);
+
+        return playerMatches.length
+          ? playerMatches
+              .map((m) => {
+                const ev = eventById(m.eventId);
+                const roundText = formatRoundLabel(
+                  ev && ev.id === "squash" ? formatSquashRoundTag(m.round) : m.round,
+                );
+                return `<div class="event-card open" style="margin-bottom:10px;"><div class="event-body" style="border-top:none;">
+        <div class="round-label">${ev ? ev.name : m.eventId} · ${roundText}</div>
+        ${renderMatchRow(m)}
+      </div></div>`;
+              })
+              .join("")
+          : `<div class="empty-state"><div class="big">No scheduled matches</div></div>`;
+      }
+
       function renderPlayersMaster() {
         if (state.pmSelectedPlayer) {
           renderPlayerDetailView();
@@ -9660,38 +10625,15 @@
         const name = state.pmSelectedPlayer;
         const paid = isPlayerPaid(name);
 
-        const playerMatches = state.matches
-          .filter((m) => {
-            const a = resolveSlot(m, "A").name;
-            const b = resolveSlot(m, "B").name;
-            return a === name || b === name;
-          })
-          .sort(compareMatches);
-
-        const matchesHtml = playerMatches.length
-          ? playerMatches
-              .map((m) => {
-                const ev = eventById(m.eventId);
-                const roundText =
-                  ev && ev.id === "squash"
-                    ? formatSquashRoundTag(m.round)
-                    : m.round;
-                return `<div class="event-card open" style="margin-bottom:10px;"><div class="event-body" style="border-top:none;">
-        <div class="round-label">${ev ? ev.name : m.eventId} · ${roundText}</div>
-        ${renderMatchRow(m)}
-      </div></div>`;
-              })
-              .join("")
-          : `<div class="empty-state"><div class="big">No scheduled matches</div></div>`;
-
         detailEl.innerHTML = `
     <button class="pm-back-inline" id="pm-detail-back">← All players</button>
     <div class="pm-player-card">
       <div class="pm-player-name">${escapeHtml(name)}</div>
       <button class="payment-badge tappable ${paid ? "paid" : "unpaid"}" id="pm-payment-btn">${paid ? "✓ PAID" : "UNPAID"}</button>
     </div>
+    ${playerStatsHtml(name)}
     <div class="section-title" style="margin-top:18px;">Schedule &amp; Results<div class="rule"></div></div>
-    ${matchesHtml}`;
+    ${playerScheduleHtml(name)}`;
 
         document
           .getElementById("pm-detail-back")
@@ -9704,6 +10646,28 @@
           .addEventListener("click", () => openPaymentModal(name));
         attachMatchHandlers(detailEl);
       }
+
+      // Non-admin equivalent of the Players Master detail view (read-only --
+      // no payment badge), reached by tapping a player's name directly on a
+      // match card instead of via the admin-only hamburger menu.
+      function renderPlayerProfileView() {
+        const name = state.viewPlayerName;
+        const contentEl = document.getElementById("player-profile-content");
+        contentEl.innerHTML = `
+    <div class="pm-player-card">
+      <div class="pm-player-name">${escapeHtml(name)}</div>
+    </div>
+    ${playerStatsHtml(name)}
+    <div class="section-title" style="margin-top:18px;">Schedule &amp; Results<div class="rule"></div></div>
+    ${playerScheduleHtml(name)}`;
+        attachMatchHandlers(contentEl);
+      }
+      document
+        .getElementById("player-profile-back")
+        .addEventListener("click", () => {
+          state.viewPlayerName = null;
+          render();
+        });
 
       document
         .getElementById("pm-search-input")
@@ -9901,6 +10865,18 @@
         } else {
           clearBtn.style.display = "none";
         }
+
+        if (state.viewPlayerName) {
+          document.getElementById("players-master-view").style.display =
+            "none";
+          document.getElementById("search-results").style.display = "none";
+          document.getElementById("home-content").style.display = "none";
+          document.getElementById("player-profile-view").style.display =
+            "block";
+          renderPlayerProfileView();
+          return;
+        }
+        document.getElementById("player-profile-view").style.display = "none";
 
         if (state.showPlayersMaster) {
           document.getElementById("search-results").style.display = "none";

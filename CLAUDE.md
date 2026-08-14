@@ -28,13 +28,16 @@ names, and import/export the whole dataset as JSON.
   `initializeFirestore(fbApp, {localCache: persistentLocalCache({tabManager:
   persistentSingleTabManager()})})`, not plain `getFirestore`, so writes queue
   in IndexedDB and survive a dropped connection or reload. Last-write-wins is
-  the accepted conflict policy (no transactions/locking) — the existing
-  5-second-hold-before-sinking-to-the-bottom behavior for just-completed
-  matches is the intended safety net for catching and reverting a mistake.
-  Don't reintroduce per-admin accounts, transactions, or "someone else just
-  edited this" conflict warnings without asking — all three were explicitly
-  decided against. The `#offline-banner` (shown to everyone, not just admins)
-  toggles on the browser's native `online`/`offline` events.
+  the accepted conflict policy (no transactions/locking) — the `#confirm-winner-modal`
+  Yes/No prompt shown before `confirmWinner` ever writes (see "Confirm Winner
+  modal" below) is the intended safety net for catching a mistake, replacing
+  the older 5-second-hold-before-sinking-to-the-bottom behavior (removed by
+  user request — a completed match now sinks to the bottom of its event's
+  list immediately, no revert window). Don't reintroduce per-admin accounts,
+  transactions, "someone else just edited this" conflict warnings, or the old
+  5-second hold without asking — all four were explicitly decided against.
+  The `#offline-banner` (shown to everyone, not just admins) toggles on the
+  browser's native `online`/`offline` events.
 - **Backgrounded-tab read staleness fix:** mobile browsers can suspend a
   tab's WebSocket while the phone is locked or the tab isn't focused, so a
   Firestore `onSnapshot` update that lands while a viewer's phone is
@@ -49,6 +52,54 @@ names, and import/export the whole dataset as JSON.
   silently (no completed-match toast for a transition that happened while
   backgrounded) since that toast is for catching a *live* transition, not
   catching up after the fact.
+
+## Automated Firestore backups
+- **`.github/workflows/firestore-backup.yml`** runs `scripts/backup-firestore.mjs`
+  on a schedule (every 4 hours, cron `0 */4 * * *`, plus manual
+  `workflow_dispatch`) and commits the result to `data-backups/backup-<ISO
+  timestamp>.json` if anything changed. This is deliberately broader than the
+  admin's own **⇅ Import/Export** screen's *export* side, which only round-trips
+  `events`/`matches`/`pendingPlayers` as `.xlsx` — the scheduled backup also
+  captures `playerPayments`, which the in-app `.xlsx` export doesn't touch at all.
+  The workflow prunes to the most recent 30 snapshots (~5 days at the default
+  cadence) so the repo doesn't grow unbounded.
+- **Setup required (one-time, can't be done from this session):** create a
+  Firebase/GCP service account with **read-only** Firestore access
+  (`roles/datastore.viewer` is enough — this key lives in GitHub Actions, so
+  keep its permissions minimal), download its JSON key, and add the full JSON
+  as a GitHub Actions secret named `FIREBASE_BACKUP_SERVICE_ACCOUNT_KEY` on
+  this repo (Settings → Secrets and variables → Actions). Without that
+  secret the workflow will fail every run with an auth error.
+- **Restoring, in-app (the normal path):** the **⇅ Import/Export** modal has a
+  second section, **"Restore From Backup Snapshot"**, below the existing
+  `.xlsx` import — "🕐 Browse Snapshots…" lists `data-backups/` via GitHub's
+  public, unauthenticated, CORS-enabled Contents API (`BACKUP_REPO`/
+  `BACKUP_BRANCH` consts near `firebaseConfig`; no token needed since the repo
+  is public), auto-loads the most recent one, and shows a picker (`<select>`)
+  for older ones. Picking a snapshot fetches its raw JSON, and "Override With
+  Snapshot" does the same delete-all-then-rewrite as the `.xlsx` override —
+  except it also wipes and rewrites `playerPayments`, since a snapshot (unlike
+  an `.xlsx` file) actually carries that collection. `pendingImportData`/
+  `pendingImportSource`/the override button/its confirm-and-write handler are
+  now shared between both the `.xlsx` and snapshot paths (see `io-override-btn`
+  click handler) — the `playerPayments` collection is only touched when
+  `pendingImportData.playerPayments` is present, so `.xlsx` imports still never
+  touch payment records, exactly as before. Choosing a file clears any pending
+  snapshot selection and vice versa (only one source can be "loaded and ready
+  to override with" at a time).
+- **Restoring, from the command line (disaster recovery / no browser):**
+  `scripts/restore-firestore.mjs <backup-file.json> --confirm`, run locally by
+  an admin (never from CI). Same wipe-and-rewrite semantics across all 4
+  collections. Needs a service account key with *write* access
+  (`roles/datastore.user` or broader) via `FIREBASE_SERVICE_ACCOUNT_KEY` or
+  `GOOGLE_APPLICATION_CREDENTIALS` — deliberately kept separate from (and
+  more privileged than) the read-only key used by the scheduled backup, and
+  deliberately never automated/scheduled since restoring is a destructive,
+  human-in-the-loop decision. Running without `--confirm` prints a dry-run
+  summary and writes nothing.
+- `scripts/` has its own `package.json` (`firebase-admin`) — `npm install`
+  inside `scripts/` before running either script locally. Not part of the
+  deployed app; `index.html` doesn't depend on anything in `scripts/`.
 
 ## Data model (see SEED_DATA constant embedded in the HTML file)
 - `events`: `{id, name, sport, category, gender, day, format, equipment, status}`.
@@ -227,8 +278,46 @@ group/pool standings are tallied; they are not auto-computed from match results.
   stale docs from a previous schedule version.
 
 ## UI conventions already built (keep consistent with these if adding features)
-- Dark theme default (`#0B0E14` bg), light theme toggle, Teko/Inter/IBM Plex Mono fonts,
-  saffron/green flag-bar accent on the logo only (no literal tricolor elsewhere).
+- **Modern/futuristic glass-and-glow visual language** (user request): dark theme default
+  (`#05070C` bg with two faint fixed radial-gradient glow blobs behind the top corners via
+  `body::before`), light theme toggle, Teko/Inter/IBM Plex Mono fonts, saffron/green
+  flag-bar accent on the logo only (no literal tricolor elsewhere). Surfaces that sit above
+  the base background (header, event cards, modals, menu dropdown, search dropdown, toasts)
+  use the `--glass`/`--glass-strong`/`--glass-border` tokens (translucent + `backdrop-filter:
+  blur(...)`) instead of flat opaque colors. Interactive/semantic accents (active chip,
+  `.btn.primary`/`.btn.danger`, winner player card, live match row, Start Match/Delete/Edit
+  mini-buttons, standings button) use the `--glow-saffron`/`--glow-win`/`--glow-live`/
+  `--glow-info` box-shadow tokens and small gradient fills rather than flat single colors.
+  `--radius`/`--radius-sm`/`--radius-lg` replace one-off `border-radius` pixel values on
+  cards/inputs/buttons (small fixed-pixel radii on true pills/circles, e.g. `.live-badge`,
+  `.icon-btn`, are left as-is). Every interactive element gets a `transition` using the
+  shared `--ease` curve, plus a hover lift (`translateY(-1px)`) and/or `:active { transform:
+  scale(0.96–0.98) }` press feedback — apply the same pattern to new buttons/cards rather
+  than leaving them static. This was a pure CSS pass — no class names, DOM structure, or JS
+  behavior changed, so don't assume a visual tweak here implies a behavior change too.
+- **Per-event, per-group division-pill colors** (user request, generalizing what was
+  previously a squash-only feature): every match card's round/division pill and left-border
+  accent is colored, not just squash's. `matchDivisionHue(match)` picks a hue from a fixed
+  15-entry `DIVISION_HUES` palette — large enough that no event's distinct (age-band, group)
+  divisions can ever collide on the same hue (`tt_men` peaks at 12) — via
+  `eventDivisionOrder(eventId)` (same youngest-band-first, Group-A-before-B ordering as the
+  Standings feature, reusing `ageBandSortKey`) for the within-event index, plus a per-event
+  starting offset (`EVENT_COLOR_ORDER`, stride 2 — coprime with 15, so all 9 events land on
+  distinct starting hues) so two different events read as visually distinct even side by side
+  in a mixed list (search results, Players Master schedule). `matchGroupIdentity(match)`
+  extends `matchCategoryPrefix` with the specific group letter *only* while a match is still
+  in its own group/pool stage — once a bracket reaches Semifinal/Final the groups have
+  merged, so those rounds fall back to just the age-band, mirroring squash's pre-existing
+  GA-/GB-/A25- behavior (group-stage matches get their own color, semis/final get a third,
+  separate one for the same age band). `divisionColorStyle(hue)` is theme-aware (dark: bright
+  pastel-on-dark; light: darker/more saturated for contrast on white) and applied via inline
+  `style` on `.division-pill` and the match's left border, not fixed CSS classes, since the
+  number of divisions varies per event and can't be enumerated ahead of time — this replaced
+  the old hardcoded `.match-kids`/`.match-group-a`/`.match-group-b`/`.match-mens` classes
+  entirely. Squash keeps its own short pill *labels* ("Kids", "15-25", etc. via
+  `squashDivisionLabel`, unchanged) since match.code parses more reliably than its round text
+  for that event; every other event's pill just shows the round text
+  (`formatRoundLabel(m.round)`).
 - No "day filter" chips (removed by user request) — only sport filter chips remain.
 - No "ADMIN MODE" banner (removed by user request) — admin controls live inside the
   **☰ hamburger menu** (top-right), not as standalone header icons. The header itself
@@ -255,21 +344,27 @@ group/pool standings are tallied; they are not auto-computed from match results.
 - Each expanded event shows its own mini progress bar (`.event-progress-row`, same
   `X / Y matches played` style as the header one) as the first line of its body, scoped
   to just that event's matches.
-- **5-second revert window:** when a match flips to `status:"completed"` *during the
-  current session* (tracked in `state.completedAt`, keyed by matchId — matches already
-  completed before load skip the wait), it stays in its normal chronological spot for 5s
-  so admin can undo without hunting for it, then sinks to the bottom of that event's match
-  list (`compareForEventPile` in `renderEventsList`). This only applies to the home page's
-  per-event list — search results and Players Master still sort matches purely
+- **No revert window** (removed by user request, along with `state.completedAt`/
+  `isHeldCompleted`) — a match that resolves to `status:"completed"` (see
+  `isMatchResolvedComplete`) sinks to the bottom of its event's match list
+  (`compareForEventPile` in `renderEventsList`) immediately on the very next
+  render, no delay. The safety net for a mis-tap is now front-loaded into the
+  **Confirm Winner modal** below rather than a grace period after the fact.
+  This sink-to-bottom behavior only applies to the home page's per-event list
+  — search results and Players Master still sort matches purely
   chronologically.
 - **No "Mark Result"/"Edit Result"/"Reset" buttons** (removed by user request — these are
   three of the match-admin buttons that were deliberately removed and shouldn't come back).
   Marking/changing/undoing a result is a tap gesture on the player themselves: tapping a
-  non-TBD player marks them the winner (`confirmWinner`); tapping the *current* winner again
-  clears the result back to `"upcoming"` (`resetMatch`) — both instant, no confirmation.
-  Tapping the *other* player while one is already marked opens the **"Switch Winner?"**
-  confirm popup (`#switch-winner-modal`, `openSwitchWinnerModal`) rather than switching
-  instantly — Cancel leaves it untouched, "Switch" calls `confirmWinner` with the new slot.
+  non-TBD player on a match that isn't yet completed opens the **"Confirm Winner?"**
+  Yes/No popup (`#confirm-winner-modal`, `openConfirmWinnerModal`, added by user request to
+  replace the old instant-completion-plus-5-second-hold behavior) — "No"/✕ leaves the match
+  untouched, "Yes" calls `confirmWinner` with that slot. Tapping the *current* winner again
+  still clears the result back to `"upcoming"` (`resetMatch`) instantly, no confirmation —
+  that part wasn't asked to change. Tapping the *other* player while one is already marked
+  opens the separate **"Switch Winner?"** confirm popup (`#switch-winner-modal`,
+  `openSwitchWinnerModal`) rather than switching instantly — Cancel leaves it untouched,
+  "Switch" calls `confirmWinner` with the new slot.
   This works identically whether the match is live, upcoming, or already completed — `canTap`
   in `renderMatchRow`'s `playerHtml()` is `state.isAdmin && !resolved.tbd`, deliberately not
   gated on `isDone`. The buttons left under a match are "▶ Start Match" (renamed from
@@ -314,18 +409,25 @@ group/pool standings are tallied; they are not auto-computed from match results.
     dropdown on a genuine click-away, and without the `mousedown` guard that same handler
     was firing for in-dropdown clicks too, closing "Show more"'s expanded list right back
     up a moment after it opened.
-- **`.search-card` has no `backdrop-filter` of its own** (deliberately removed) — it
-  lives inside `header.app-header`, which already has `backdrop-filter: blur(10px)`.
-  Nesting a second `backdrop-filter` region on `.search-card` caused a real bug on iOS
-  Safari: `#search-dropdown` (the player-search autocomplete list) is `position:
-  absolute` and extends below `.search-card`'s own box, escaping the inner blur
-  region — Safari's compositor let the sport filter chips / progress bar bleed
-  visibly through the dropdown instead of being fully hidden behind its opaque
-  background. `#search-dropdown` also has `isolation: isolate` now as a defensive
-  second layer against the same class of bug. Don't reintroduce a `backdrop-filter`
-  on `.search-card` (or anything else an absolutely-positioned overlay needs to
-  escape) without re-testing on real iOS Safari, not just desktop Chrome — this
-  didn't reproduce as bleed-through in a plain Chromium screenshot test.
+- **Known open risk: nested `backdrop-filter` on `.search-card`/`#search-dropdown`
+  bled the sport filter chips through the player-search dropdown on iOS Safari**
+  (reported with a screenshot) — `.search-card` sits inside `header.app-header`,
+  and both had their own `backdrop-filter`; `#search-dropdown` (`position:
+  absolute`, extending below `.search-card`'s own box) escapes the inner blur
+  region, and Safari's compositor let content behind it bleed through instead of
+  staying fully hidden. This was fixed once (removing `.search-card`'s own
+  `backdrop-filter`), but the glass-morphism redesign below reintroduced —
+  and expanded — nested `backdrop-filter` everywhere, including a *stronger*
+  blur back on `.search-card` and `#search-dropdown` itself (now `background:
+  var(--glass-strong)` instead of a fully solid color). `#search-dropdown` still
+  has `isolation: isolate` as a defensive measure, but **whether the bleed-through
+  actually recurs under the new glass design hasn't been re-verified on a real
+  iOS device** — this sandbox can't load the app at all (gstatic.com, where the
+  Firebase SDK is hosted, is blocked by network policy here) and the bug didn't
+  reproduce in a plain Chromium screenshot test even before the redesign, so it's
+  Safari-compositor-specific. If it resurfaces, the fix is the same: stop nesting
+  `backdrop-filter` regions where an absolutely-positioned child needs to escape
+  one of them, not just add more isolation/opacity.
 - **"🗑 Delete" button** on every match (`deleteMatchWithConfirm`) — admin-only, gated behind
   a custom in-app confirm modal (`#delete-match-modal`, styled like every other modal —
   **not** a native `confirm()`, that was deliberately replaced by user request), then
