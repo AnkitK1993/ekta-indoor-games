@@ -781,6 +781,12 @@
       .player.admin-tap:hover {
         border-color: var(--saffron);
       }
+      .player.view-tap {
+        cursor: pointer;
+      }
+      .player.view-tap:hover {
+        border-color: var(--info);
+      }
       .trophy {
         margin-left: 4px;
       }
@@ -975,6 +981,50 @@
       }
       .payment-badge.tappable {
         cursor: pointer;
+      }
+      .player-stats-grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+        gap: 10px;
+        margin-top: 10px;
+      }
+      .player-stat-card {
+        background: var(--surface);
+        border: 1px solid var(--border);
+        border-radius: 12px;
+        padding: 12px;
+      }
+      .player-stat-event {
+        font-size: 11.5px;
+        font-weight: 700;
+        color: var(--muted);
+        margin-bottom: 8px;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
+      }
+      .player-stat-numbers {
+        display: flex;
+        justify-content: space-between;
+        gap: 6px;
+      }
+      .player-stat-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+      .player-stat-value {
+        font-family: "Teko";
+        font-size: 22px;
+        font-weight: 600;
+        line-height: 1;
+      }
+      .player-stat-label {
+        font-size: 9.5px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--muted-dim);
+        margin-top: 2px;
       }
 
       /* ===== Toast ===== */
@@ -1321,6 +1371,13 @@
           <div id="pm-list"></div>
         </div>
         <div id="pm-detail" style="display: none"></div>
+      </div>
+
+      <div id="player-profile-view" style="display: none">
+        <div class="pm-toolbar">
+          <button class="pm-back-btn" id="player-profile-back">← Back</button>
+        </div>
+        <div id="player-profile-content"></div>
       </div>
 
       <div id="home-content">
@@ -8149,6 +8206,7 @@
         pmSearchQuery: "",
         pmSelectedPlayer: null, // player name, or null when showing the list
         pmPaymentTarget: null, // player name the payment modal is open for
+        viewPlayerName: null, // non-admin: player whose profile (stats + schedule) is open, or null
       };
 
       // Immediate local fallback so the homepage has data before Firestore connects.
@@ -9375,7 +9433,23 @@
 
       /* ===================== RENDER: FILTER CHIPS ===================== */
       function renderChips() {
-        const sports = ["All", ...new Set(state.events.map((e) => e.sport))];
+        // Fixed display order for the sport chips, matching SEED_DATA's
+        // original event order (TT, Carrom, Pool, Chess, Squash). Firestore
+        // doesn't guarantee `collection(db,"events")` comes back in write
+        // order -- in practice it lands roughly alphabetical by doc ID,
+        // which pushed the "TT" chip to the very end (past "Squash") and
+        // off-screen. Any sport not in this list (shouldn't happen) is
+        // appended at the end rather than dropped. Scoped inside the
+        // function (not a module-level const) since render() can fire from
+        // the auth-state callback before a top-level const below this point
+        // in the module would have finished initializing.
+        const SPORT_ORDER = ["TT", "Carrom", "Pool", "Chess", "Squash"];
+        const present = new Set(state.events.map((e) => e.sport));
+        const orderedSports = SPORT_ORDER.filter((s) => present.has(s));
+        present.forEach((s) => {
+          if (!orderedSports.includes(s)) orderedSports.push(s);
+        });
+        const sports = ["All", ...orderedSports];
         const sportWrap = document.getElementById("sport-chips");
         sportWrap.innerHTML = sports
           .map(
@@ -9411,10 +9485,14 @@
           if (resolved.tbd) classes.push("tbd");
           const canTap = state.isAdmin && !resolved.tbd;
           if (canTap) classes.push("admin-tap");
+          // Non-admin: tapping a resolved player's name opens their profile
+          // (stats + schedule) instead of the admin winner-marking gesture.
+          const canView = !state.isAdmin && !resolved.tbd;
+          if (canView) classes.push("view-tap");
           const editBtn = state.isAdmin
             ? `<span style="font-size:10px;color:var(--info);margin-left:4px;" data-edit="${slotKey}">✎ edit</span>`
             : "";
-          return `<div class="${classes.join(" ")}" ${canTap ? `data-tapwinner="${slotKey}"` : ""}>
+          return `<div class="${classes.join(" ")}" ${canTap ? `data-tapwinner="${slotKey}"` : ""} ${canView ? `data-viewplayer="${escapeHtml(resolved.name)}"` : ""}>
       <span>${resolved.name}${isWinner ? '<span class="trophy">🏆</span>' : ""}</span>
       ${resolved.age ? `<span class="age">Age ${resolved.age}</span>` : ""}
       ${editBtn}
@@ -9494,6 +9572,13 @@
               if (action === "live") setMatchStatus(match, "live");
               else if (action === "upcoming") setMatchStatus(match, "upcoming");
               else if (action === "deletematch") deleteMatchWithConfirm(match);
+            });
+          });
+          matchEl.querySelectorAll("[data-viewplayer]").forEach((p) => {
+            p.addEventListener("click", (e) => {
+              e.stopPropagation();
+              state.viewPlayerName = p.dataset.viewplayer;
+              render();
             });
           });
         });
@@ -9837,6 +9922,86 @@
         return [...names].sort((a, b) => a.localeCompare(b));
       }
 
+      // Per-event win/loss/played record for one player, counting only
+      // matches that are genuinely decided (see isMatchResolvedComplete --
+      // a match whose winner came from a group-standings/placeholder slot
+      // that later un-resolved must not count here either).
+      function computePlayerEventStats(name) {
+        const byEvent = new Map();
+        state.matches.forEach((m) => {
+          if (!isMatchResolvedComplete(m)) return;
+          const a = resolveSlot(m, "A"),
+            b = resolveSlot(m, "B");
+          let mySlot = null;
+          if (a.name === name) mySlot = "A";
+          else if (b.name === name) mySlot = "B";
+          if (!mySlot) return;
+          if (!byEvent.has(m.eventId)) {
+            const ev = eventById(m.eventId);
+            byEvent.set(m.eventId, {
+              eventName: ev ? ev.name : m.eventId,
+              played: 0,
+              won: 0,
+              lost: 0,
+            });
+          }
+          const rec = byEvent.get(m.eventId);
+          rec.played++;
+          if (m.winnerSlot === mySlot) rec.won++;
+          else rec.lost++;
+        });
+        return [...byEvent.values()].sort((x, y) =>
+          x.eventName.localeCompare(y.eventName),
+        );
+      }
+
+      function playerStatsHtml(name) {
+        const stats = computePlayerEventStats(name);
+        if (!stats.length) return "";
+        return `
+    <div class="section-title" style="margin-top:18px;">Stats<div class="rule"></div></div>
+    <div class="player-stats-grid">
+      ${stats
+        .map(
+          (s) => `
+      <div class="player-stat-card">
+        <div class="player-stat-event">${escapeHtml(s.eventName)}</div>
+        <div class="player-stat-numbers">
+          <div class="player-stat-item"><span class="player-stat-value">${s.played}</span><span class="player-stat-label">Played</span></div>
+          <div class="player-stat-item"><span class="player-stat-value">${s.won}</span><span class="player-stat-label">Won</span></div>
+          <div class="player-stat-item"><span class="player-stat-value">${s.lost}</span><span class="player-stat-label">Lost</span></div>
+        </div>
+      </div>`,
+        )
+        .join("")}
+    </div>`;
+      }
+
+      function playerScheduleHtml(name) {
+        const playerMatches = state.matches
+          .filter((m) => {
+            const a = resolveSlot(m, "A").name;
+            const b = resolveSlot(m, "B").name;
+            return a === name || b === name;
+          })
+          .sort(compareMatches);
+
+        return playerMatches.length
+          ? playerMatches
+              .map((m) => {
+                const ev = eventById(m.eventId);
+                const roundText = formatRoundLabel(
+                  ev && ev.id === "squash" ? formatSquashRoundTag(m.round) : m.round,
+                );
+                return `<div class="event-card open" style="margin-bottom:10px;"><div class="event-body" style="border-top:none;">
+        <div class="round-label">${ev ? ev.name : m.eventId} · ${roundText}</div>
+        ${renderMatchRow(m)}
+      </div></div>`;
+              })
+              .join("")
+          : `<div class="empty-state"><div class="big">No scheduled matches</div></div>`;
+      }
+
       function renderPlayersMaster() {
         if (state.pmSelectedPlayer) {
           renderPlayerDetailView();
@@ -9891,37 +10056,15 @@
         const name = state.pmSelectedPlayer;
         const paid = isPlayerPaid(name);
 
-        const playerMatches = state.matches
-          .filter((m) => {
-            const a = resolveSlot(m, "A").name;
-            const b = resolveSlot(m, "B").name;
-            return a === name || b === name;
-          })
-          .sort(compareMatches);
-
-        const matchesHtml = playerMatches.length
-          ? playerMatches
-              .map((m) => {
-                const ev = eventById(m.eventId);
-                const roundText = formatRoundLabel(
-                  ev && ev.id === "squash" ? formatSquashRoundTag(m.round) : m.round,
-                );
-                return `<div class="event-card open" style="margin-bottom:10px;"><div class="event-body" style="border-top:none;">
-        <div class="round-label">${ev ? ev.name : m.eventId} · ${roundText}</div>
-        ${renderMatchRow(m)}
-      </div></div>`;
-              })
-              .join("")
-          : `<div class="empty-state"><div class="big">No scheduled matches</div></div>`;
-
         detailEl.innerHTML = `
     <button class="pm-back-inline" id="pm-detail-back">← All players</button>
     <div class="pm-player-card">
       <div class="pm-player-name">${escapeHtml(name)}</div>
       <button class="payment-badge tappable ${paid ? "paid" : "unpaid"}" id="pm-payment-btn">${paid ? "✓ PAID" : "UNPAID"}</button>
     </div>
+    ${playerStatsHtml(name)}
     <div class="section-title" style="margin-top:18px;">Schedule &amp; Results<div class="rule"></div></div>
-    ${matchesHtml}`;
+    ${playerScheduleHtml(name)}`;
 
         document
           .getElementById("pm-detail-back")
@@ -9934,6 +10077,28 @@
           .addEventListener("click", () => openPaymentModal(name));
         attachMatchHandlers(detailEl);
       }
+
+      // Non-admin equivalent of the Players Master detail view (read-only --
+      // no payment badge), reached by tapping a player's name directly on a
+      // match card instead of via the admin-only hamburger menu.
+      function renderPlayerProfileView() {
+        const name = state.viewPlayerName;
+        const contentEl = document.getElementById("player-profile-content");
+        contentEl.innerHTML = `
+    <div class="pm-player-card">
+      <div class="pm-player-name">${escapeHtml(name)}</div>
+    </div>
+    ${playerStatsHtml(name)}
+    <div class="section-title" style="margin-top:18px;">Schedule &amp; Results<div class="rule"></div></div>
+    ${playerScheduleHtml(name)}`;
+        attachMatchHandlers(contentEl);
+      }
+      document
+        .getElementById("player-profile-back")
+        .addEventListener("click", () => {
+          state.viewPlayerName = null;
+          render();
+        });
 
       document
         .getElementById("pm-search-input")
@@ -10131,6 +10296,18 @@
         } else {
           clearBtn.style.display = "none";
         }
+
+        if (state.viewPlayerName) {
+          document.getElementById("players-master-view").style.display =
+            "none";
+          document.getElementById("search-results").style.display = "none";
+          document.getElementById("home-content").style.display = "none";
+          document.getElementById("player-profile-view").style.display =
+            "block";
+          renderPlayerProfileView();
+          return;
+        }
+        document.getElementById("player-profile-view").style.display = "none";
 
         if (state.showPlayersMaster) {
           document.getElementById("search-results").style.display = "none";
