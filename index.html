@@ -8758,13 +8758,41 @@
         return ranked;
       }
 
+      // Age-band prefix of a group-stage round name itself (e.g. "Under 46"
+      // out of "Under 46 - Group A", "" out of "Pool A"/"Pool B"/"Pool" for
+      // the events with no age split) -- same suffix list as
+      // matchCategoryPrefix, just applied directly to a round string instead
+      // of a match's own round.
+      function ageBandPrefixFromRound(round) {
+        const suffixes = [" - Group A", " - Group B", " - Pool", " - Semifinal", " - Final"];
+        for (const suf of suffixes) {
+          if (round.endsWith(suf)) return round.slice(0, -suf.length);
+        }
+        return "";
+      }
+      // Turns an age-band prefix into a number to sort ascending by age.
+      // "Under N" -> just below N (so it lands before an "N to M" band that
+      // starts at the same N); "Above N"/"N and above" -> just past N (so it
+      // lands after an "Under N" band with the same N, e.g. carrom_men's
+      // "Under 46" then "Above 46"); anything else ("N to M", "N-M Bracket")
+      // uses its first number as-is (its lower bound).
+      function ageBandSortKey(prefix) {
+        if (!prefix) return 0;
+        const n = prefix.match(/\d+/);
+        if (!n) return 0;
+        if (/^under\b/i.test(prefix)) return +n[0] - 0.5;
+        if (/above|and above/i.test(prefix)) return +n[0] + 0.5;
+        return +n[0];
+      }
+
       // Every round-robin/group/pool round that feeds a manual slot somewhere
       // in this event, discovered the same way resolveSlot finds them (via
       // parseManualSlotName + stripFinalSuffix + findGroupStageRound) rather
       // than hardcoding a naming convention — so it stays correct across the
       // 4 different manual-slot-name templates and the tt_women "Pool A/B"
-      // exception. Returns unique round names, in tournament (matchNumber)
-      // order, for driving the Standings view.
+      // exception. Returns unique round names, ordered youngest age band
+      // first, then alphabetically within the same band (Group A before
+      // Group B) — for driving the Standings view.
       function eventGroupStageRounds(eventId) {
         const rounds = new Map();
         state.matches
@@ -8783,13 +8811,9 @@
             });
           });
         return [...rounds.keys()].sort((a, b) => {
-          const numFor = (round) => {
-            const nums = state.matches
-              .filter((m) => m.eventId === eventId && m.round === round)
-              .map((m) => m.matchNumber ?? Infinity);
-            return nums.length ? Math.min(...nums) : Infinity;
-          };
-          return numFor(a) - numFor(b);
+          const keyA = ageBandSortKey(ageBandPrefixFromRound(a));
+          const keyB = ageBandSortKey(ageBandPrefixFromRound(b));
+          return keyA - keyB || a.localeCompare(b);
         });
       }
 
@@ -8830,6 +8854,9 @@
             l.lost++;
           }
         });
+        // Ranked by wins desc, losses asc, alphabetically as the final
+        // tiebreak -- which is also what this defaults to before any
+        // matches are played (everyone at 0-0, so purely alphabetical).
         return [...players.values()].sort(
           (x, y) => y.won - x.won || x.lost - y.lost || x.name.localeCompare(y.name),
         );
