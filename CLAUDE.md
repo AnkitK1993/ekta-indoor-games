@@ -28,13 +28,16 @@ names, and import/export the whole dataset as JSON.
   `initializeFirestore(fbApp, {localCache: persistentLocalCache({tabManager:
   persistentSingleTabManager()})})`, not plain `getFirestore`, so writes queue
   in IndexedDB and survive a dropped connection or reload. Last-write-wins is
-  the accepted conflict policy (no transactions/locking) — the existing
-  5-second-hold-before-sinking-to-the-bottom behavior for just-completed
-  matches is the intended safety net for catching and reverting a mistake.
-  Don't reintroduce per-admin accounts, transactions, or "someone else just
-  edited this" conflict warnings without asking — all three were explicitly
-  decided against. The `#offline-banner` (shown to everyone, not just admins)
-  toggles on the browser's native `online`/`offline` events.
+  the accepted conflict policy (no transactions/locking) — the `#confirm-winner-modal`
+  Yes/No prompt shown before `confirmWinner` ever writes (see "Confirm Winner
+  modal" below) is the intended safety net for catching a mistake, replacing
+  the older 5-second-hold-before-sinking-to-the-bottom behavior (removed by
+  user request — a completed match now sinks to the bottom of its event's
+  list immediately, no revert window). Don't reintroduce per-admin accounts,
+  transactions, "someone else just edited this" conflict warnings, or the old
+  5-second hold without asking — all four were explicitly decided against.
+  The `#offline-banner` (shown to everyone, not just admins) toggles on the
+  browser's native `online`/`offline` events.
 - **Backgrounded-tab read staleness fix:** mobile browsers can suspend a
   tab's WebSocket while the phone is locked or the tab isn't focused, so a
   Firestore `onSnapshot` update that lands while a viewer's phone is
@@ -248,21 +251,27 @@ group/pool standings are tallied; they are not auto-computed from match results.
 - Each expanded event shows its own mini progress bar (`.event-progress-row`, same
   `X / Y matches played` style as the header one) as the first line of its body, scoped
   to just that event's matches.
-- **5-second revert window:** when a match flips to `status:"completed"` *during the
-  current session* (tracked in `state.completedAt`, keyed by matchId — matches already
-  completed before load skip the wait), it stays in its normal chronological spot for 5s
-  so admin can undo without hunting for it, then sinks to the bottom of that event's match
-  list (`compareForEventPile` in `renderEventsList`). This only applies to the home page's
-  per-event list — search results and Players Master still sort matches purely
+- **No revert window** (removed by user request, along with `state.completedAt`/
+  `isHeldCompleted`) — a match that resolves to `status:"completed"` (see
+  `isMatchResolvedComplete`) sinks to the bottom of its event's match list
+  (`compareForEventPile` in `renderEventsList`) immediately on the very next
+  render, no delay. The safety net for a mis-tap is now front-loaded into the
+  **Confirm Winner modal** below rather than a grace period after the fact.
+  This sink-to-bottom behavior only applies to the home page's per-event list
+  — search results and Players Master still sort matches purely
   chronologically.
 - **No "Mark Result"/"Edit Result"/"Reset" buttons** (removed by user request — these are
   three of the match-admin buttons that were deliberately removed and shouldn't come back).
   Marking/changing/undoing a result is a tap gesture on the player themselves: tapping a
-  non-TBD player marks them the winner (`confirmWinner`); tapping the *current* winner again
-  clears the result back to `"upcoming"` (`resetMatch`) — both instant, no confirmation.
-  Tapping the *other* player while one is already marked opens the **"Switch Winner?"**
-  confirm popup (`#switch-winner-modal`, `openSwitchWinnerModal`) rather than switching
-  instantly — Cancel leaves it untouched, "Switch" calls `confirmWinner` with the new slot.
+  non-TBD player on a match that isn't yet completed opens the **"Confirm Winner?"**
+  Yes/No popup (`#confirm-winner-modal`, `openConfirmWinnerModal`, added by user request to
+  replace the old instant-completion-plus-5-second-hold behavior) — "No"/✕ leaves the match
+  untouched, "Yes" calls `confirmWinner` with that slot. Tapping the *current* winner again
+  still clears the result back to `"upcoming"` (`resetMatch`) instantly, no confirmation —
+  that part wasn't asked to change. Tapping the *other* player while one is already marked
+  opens the separate **"Switch Winner?"** confirm popup (`#switch-winner-modal`,
+  `openSwitchWinnerModal`) rather than switching instantly — Cancel leaves it untouched,
+  "Switch" calls `confirmWinner` with the new slot.
   This works identically whether the match is live, upcoming, or already completed — `canTap`
   in `renderMatchRow`'s `playerHtml()` is `state.isAdmin && !resolved.tbd`, deliberately not
   gated on `isDone`. The buttons left under a match are "▶ Start Match" (renamed from
