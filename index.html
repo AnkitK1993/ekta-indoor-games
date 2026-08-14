@@ -366,6 +366,77 @@
         font-size: 11px;
       }
 
+      /* ===== Standings button + modal ===== */
+      .standings-btn-row {
+        padding: 0 16px 10px;
+      }
+      .standings-btn {
+        font-size: 11.5px;
+        font-weight: 700;
+        padding: 7px 12px;
+        border-radius: 8px;
+        border: 1px solid var(--saffron);
+        background: var(--surface3);
+        color: var(--saffron);
+      }
+      #standings-modal .modal {
+        max-width: 560px;
+      }
+      .standings-group {
+        margin-bottom: 20px;
+      }
+      .standings-group:last-child {
+        margin-bottom: 0;
+      }
+      .standings-group-title {
+        font-family: "IBM Plex Mono";
+        font-size: 11px;
+        text-transform: uppercase;
+        letter-spacing: 0.05em;
+        color: var(--muted);
+        margin-bottom: 8px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 8px;
+      }
+      .standings-group-status {
+        font-size: 10px;
+        text-transform: none;
+        letter-spacing: 0;
+        color: var(--muted-dim);
+      }
+      .standings-table {
+        width: 100%;
+        border-collapse: collapse;
+        font-size: 13px;
+      }
+      .standings-table th,
+      .standings-table td {
+        padding: 6px 8px;
+        text-align: left;
+        border-bottom: 1px solid var(--border);
+      }
+      .standings-table th {
+        color: var(--muted);
+        font-size: 10px;
+        text-transform: uppercase;
+        letter-spacing: 0.04em;
+        font-weight: 600;
+      }
+      .standings-table th.num,
+      .standings-table td.num {
+        text-align: center;
+        width: 15%;
+      }
+      .standings-table tbody tr:last-child td {
+        border-bottom: none;
+      }
+      .standings-empty {
+        color: var(--muted);
+        font-size: 12.5px;
+      }
+
       /* ===== Finished-event results summary ===== */
       .event-results-summary {
         padding: 14px 16px 4px;
@@ -1342,6 +1413,16 @@
             Delete
           </button>
         </div>
+      </div>
+    </div>
+
+    <!-- Standings Modal -->
+    <div class="modal-overlay" id="standings-modal">
+      <div class="modal">
+        <button class="modal-close" id="standings-close">✕</button>
+        <h2 id="standings-title">Standings</h2>
+        <p class="sub">Group / pool standings — wins, losses, matches played.</p>
+        <div id="standings-content"></div>
       </div>
     </div>
 
@@ -8309,6 +8390,83 @@
         return ranked;
       }
 
+      // Every round-robin/group/pool round that feeds a manual slot somewhere
+      // in this event, discovered the same way resolveSlot finds them (via
+      // parseManualSlotName + stripFinalSuffix + findGroupStageRound) rather
+      // than hardcoding a naming convention — so it stays correct across the
+      // 4 different manual-slot-name templates and the tt_women "Pool A/B"
+      // exception. Returns unique round names, in tournament (matchNumber)
+      // order, for driving the Standings view.
+      function eventGroupStageRounds(eventId) {
+        const rounds = new Map();
+        state.matches
+          .filter((m) => m.eventId === eventId)
+          .forEach((m) => {
+            ["A", "B"].forEach((slotKey) => {
+              const slot = m["player" + slotKey];
+              if (!slot || slot.type !== "manual") return;
+              const parsed = parseManualSlotName(slot.name);
+              if (!parsed) return;
+              const prefix = stripFinalSuffix(m.round);
+              if (prefix === null) return;
+              const round = findGroupStageRound(eventId, prefix, parsed.group);
+              if (!round || rounds.has(round)) return;
+              rounds.set(round, round);
+            });
+          });
+        return [...rounds.keys()].sort((a, b) => {
+          const numFor = (round) => {
+            const nums = state.matches
+              .filter((m) => m.eventId === eventId && m.round === round)
+              .map((m) => m.matchNumber ?? Infinity);
+            return nums.length ? Math.min(...nums) : Infinity;
+          };
+          return numFor(a) - numFor(b);
+        });
+      }
+
+      // Full standings table for one round-robin/group round — every player
+      // who has appeared in the round, with matches played/won/lost so far,
+      // regardless of whether the round is fully complete yet (unlike
+      // computeStandings, which only returns a ranking once the round is
+      // 100% played). Sorted by wins desc, then losses asc, then name.
+      function computeGroupTable(eventId, round) {
+        const roundMatches = state.matches.filter(
+          (m) => m.eventId === eventId && m.round === round,
+        );
+        const players = new Map();
+        roundMatches.forEach((m) => {
+          const a = resolveSlot(m, "A"),
+            b = resolveSlot(m, "B");
+          [a, b].forEach((p) => {
+            if (!p.tbd && !players.has(p.name))
+              players.set(p.name, {
+                name: p.name,
+                age: p.age,
+                played: 0,
+                won: 0,
+                lost: 0,
+              });
+          });
+          if (m.status !== "completed") return;
+          const winner = m.winnerSlot === "A" ? a : b;
+          const loser = m.winnerSlot === "A" ? b : a;
+          const w = players.get(winner.name),
+            l = players.get(loser.name);
+          if (w) {
+            w.played++;
+            w.won++;
+          }
+          if (l) {
+            l.played++;
+            l.lost++;
+          }
+        });
+        return [...players.values()].sort(
+          (x, y) => y.won - x.won || x.lost - y.lost || x.name.localeCompare(y.name),
+        );
+      }
+
       /* Recursively resolve a slot to a display object {name, age, isTbd, isWinnerOf} */
       function resolveSlot(match, slotKey) {
         const override = match["override" + slotKey];
@@ -9003,6 +9161,59 @@
           });
         });
 
+      /* ===================== STANDINGS ===================== */
+      function openStandingsModal(eventId) {
+        const ev = eventById(eventId);
+        const rounds = eventGroupStageRounds(eventId);
+        document.getElementById("standings-title").textContent = ev
+          ? `${ev.name} — Standings`
+          : "Standings";
+        const content = document.getElementById("standings-content");
+        content.innerHTML = rounds.length
+          ? rounds
+              .map((round) => {
+                const rows = computeGroupTable(eventId, round);
+                const complete = computeStandings(eventId, round) !== null;
+                if (!rows.length) return "";
+                return `
+        <div class="standings-group">
+          <div class="standings-group-title">
+            <span>${round}</span>
+            <span class="standings-group-status">${complete ? "Complete" : "In progress"}</span>
+          </div>
+          <table class="standings-table">
+            <thead>
+              <tr>
+                <th>Player</th>
+                <th class="num">P</th>
+                <th class="num">W</th>
+                <th class="num">L</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows
+                .map(
+                  (r) => `
+              <tr>
+                <td>${r.name}</td>
+                <td class="num">${r.played}</td>
+                <td class="num">${r.won}</td>
+                <td class="num">${r.lost}</td>
+              </tr>`,
+                )
+                .join("")}
+            </tbody>
+          </table>
+        </div>`;
+              })
+              .join("")
+          : `<div class="standings-empty">No group/pool standings for this event.</div>`;
+        document.getElementById("standings-modal").classList.add("show");
+      }
+      document.getElementById("standings-close").addEventListener("click", () => {
+        document.getElementById("standings-modal").classList.remove("show");
+      });
+
       /* ===================== EDIT SLOT ===================== */
       let editNameCandidates = []; // scoped (event+category) player pool for the open edit modal
       let editNameShowAll = false; // true once "Show more" expands to every tournament player
@@ -9417,9 +9628,13 @@
               const resultsSummaryHtml = isFinished
                 ? eventResultsSummaryHtml(evMatches)
                 : "";
+              const standingsBtnHtml = eventGroupStageRounds(ev.id).length
+                ? `<div class="standings-btn-row"><button type="button" class="standings-btn" data-standings="${ev.id}">🏆 Standings</button></div>`
+                : "";
               bodyHtml =
                 resultsSummaryHtml +
                 progressHtml +
+                standingsBtnHtml +
                 evMatches.map(renderMatchRow).join("");
 
               const liveMatches = evMatches.filter((m) => m.status === "live");
@@ -9468,6 +9683,12 @@
             if (state.openEvents.has(id)) state.openEvents.delete(id);
             else state.openEvents.add(id);
             render();
+          });
+        });
+        wrap.querySelectorAll("[data-standings]").forEach((btn) => {
+          btn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            openStandingsModal(btn.dataset.standings);
           });
         });
         attachMatchHandlers(wrap);
