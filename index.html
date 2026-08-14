@@ -10303,10 +10303,19 @@
               if (e.target.closest("[data-edit]")) return;
               if (e.target.closest("[data-applysuggestion]")) return;
               const slotKey = p.dataset.tapwinner;
+              // isMatchResolvedComplete, not raw match.status === "completed":
+              // if a manual/placeholder slot this match depended on has since
+              // un-resolved (e.g. admin reset the group-stage match behind
+              // "Group A 1st"), the match's own status/winnerSlot fields are
+              // still frozen at "completed" even though the card now renders
+              // as unresolved (no trophy shown) -- see isMatchResolvedComplete.
+              // Branching on the same resolved state the render just used
+              // keeps a tap doing what the card visibly promises instead of
+              // silently resetting a still-frozen "completed" record.
               const isCurrentWinner =
-                match.status === "completed" && match.winnerSlot === slotKey;
+                isMatchResolvedComplete(match) && match.winnerSlot === slotKey;
               if (isCurrentWinner) openResetMatchModal(match);
-              else if (match.status === "completed")
+              else if (isMatchResolvedComplete(match))
                 openSwitchWinnerModal(match, slotKey);
               else openConfirmWinnerModal(match, slotKey);
             });
