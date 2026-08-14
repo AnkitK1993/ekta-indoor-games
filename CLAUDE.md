@@ -56,9 +56,16 @@ names, and import/export the whole dataset as JSON.
   Every event is currently `"ready"` — nothing is pending.
 - `matches`: `{matchId, eventId, round, code, matchNumber, time, venue, day, playerA,
   playerB, status, winnerSlot, winnerName, winnerAge, loserName, overrideA, overrideB}`.
-  `matchNumber` is an ascending integer, unique across the whole schedule, shown in the
+  `matchNumber` is an ascending integer **scoped per event** (1..N within each event's
+  own matches, reassigned in chronological order whenever that event is reflowed) —
+  **not** a single global sequence across the whole 297-match schedule. Shown in the
   UI as **"Match N"** instead of the raw `code` (e.g. `U36-GA-2` displays as "Match 10").
-  `playerA`/`playerB` are one of:
+  Because it's per-event, `matchNumber` is only a valid sort key when comparing two
+  matches from the *same* event — comparing it across different events (a player's
+  cross-sport schedule, a multi-event search result) is meaningless and was a real bug
+  (`compareMatches` in `index.html`) until fixed to sort by actual day/time first,
+  falling back to `matchNumber` only within the same event. `playerA`/`playerB` are
+  one of:
   - `{type:"fixed", name, age}` — known player/pair
   - `{type:"placeholder", ref:"M3"}` — resolves to winner of match `eventId_M3`
   - `{type:"manual", name:"1st Group A"}` — a group/pool-standings slot. Auto-resolves
@@ -307,6 +314,18 @@ group/pool standings are tallied; they are not auto-computed from match results.
     dropdown on a genuine click-away, and without the `mousedown` guard that same handler
     was firing for in-dropdown clicks too, closing "Show more"'s expanded list right back
     up a moment after it opened.
+- **`.search-card` has no `backdrop-filter` of its own** (deliberately removed) — it
+  lives inside `header.app-header`, which already has `backdrop-filter: blur(10px)`.
+  Nesting a second `backdrop-filter` region on `.search-card` caused a real bug on iOS
+  Safari: `#search-dropdown` (the player-search autocomplete list) is `position:
+  absolute` and extends below `.search-card`'s own box, escaping the inner blur
+  region — Safari's compositor let the sport filter chips / progress bar bleed
+  visibly through the dropdown instead of being fully hidden behind its opaque
+  background. `#search-dropdown` also has `isolation: isolate` now as a defensive
+  second layer against the same class of bug. Don't reintroduce a `backdrop-filter`
+  on `.search-card` (or anything else an absolutely-positioned overlay needs to
+  escape) without re-testing on real iOS Safari, not just desktop Chrome — this
+  didn't reproduce as bleed-through in a plain Chromium screenshot test.
 - **"🗑 Delete" button** on every match (`deleteMatchWithConfirm`) — admin-only, gated behind
   a custom in-app confirm modal (`#delete-match-modal`, styled like every other modal —
   **not** a native `confirm()`, that was deliberately replaced by user request), then

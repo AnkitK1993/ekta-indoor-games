@@ -233,7 +233,16 @@
         gap: 10px;
         box-shadow: 0 18px 40px rgba(0, 0, 0, 0.15);
         width: 100%;
-        backdrop-filter: blur(14px);
+        /* No backdrop-filter here (deliberately removed) -- this card sits
+           inside header.app-header, which already has its own
+           backdrop-filter: blur(10px). Nesting a second backdrop-filter
+           region is a known source of iOS Safari compositing bugs where an
+           absolutely-positioned child that escapes the inner blur region
+           (the #search-dropdown suggestions list, which extends below this
+           card's own box) lets sibling content (the progress bar / sport
+           filter chips) visibly bleed through it instead of being fully
+           covered -- reported as the filter chips showing through the
+           player-search autocomplete dropdown. */
       }
       .search-card.hidden {
         display: none;
@@ -285,6 +294,7 @@
         overflow-y: auto;
         max-height: 320px;
         z-index: 10;
+        isolation: isolate;
       }
       .search-dropdown.hidden {
         display: none;
@@ -9275,16 +9285,27 @@
         return dayOffset + timeToMinutes(time);
       }
 
-      // Match # is assigned in final chronological (day, then time) order at
-      // seed time, so it's the authoritative sort key -- day/time is only a
-      // fallback for the rare match missing a matchNumber, not a substitute.
+      // matchNumber is scoped per event (1..N within each event, not a
+      // single global chronological sequence across the whole schedule), so
+      // it's only a valid sort key when comparing matches from the SAME
+      // event -- comparing matchNumber across different events (as this
+      // function must, e.g. for a player's cross-sport schedule or a
+      // multi-event search result) would wrongly order by "match 1 of event
+      // X before match 4 of event Y" instead of by actual time. Day/time is
+      // therefore the primary key; matchNumber (same event) or event name
+      // (different events, exact tie) only break ties at the same instant.
       function compareMatches(a, b) {
-        const an = a.matchNumber,
-          bn = b.matchNumber;
-        if (an != null && bn != null) return an - bn;
         const dt = dayTimeToMinutes(a.day, a.time) - dayTimeToMinutes(b.day, b.time);
         if (dt !== 0) return dt;
-        return (a.code || "").localeCompare(b.code || "");
+        if (a.eventId === b.eventId) {
+          const an = a.matchNumber,
+            bn = b.matchNumber;
+          if (an != null && bn != null) return an - bn;
+          return (a.code || "").localeCompare(b.code || "");
+        }
+        const an = eventById(a.eventId)?.name || a.eventId;
+        const bn = eventById(b.eventId)?.name || b.eventId;
+        return an.localeCompare(bn);
       }
 
       // A just-completed match stays put in its normal chronological spot for
