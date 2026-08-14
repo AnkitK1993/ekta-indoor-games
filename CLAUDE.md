@@ -271,8 +271,23 @@ group/pool standings are tallied; they are not auto-computed from match results.
   stale docs from a previous schedule version.
 
 ## UI conventions already built (keep consistent with these if adding features)
-- Dark theme default (`#0B0E14` bg), light theme toggle, Teko/Inter/IBM Plex Mono fonts,
-  saffron/green flag-bar accent on the logo only (no literal tricolor elsewhere).
+- **Modern/futuristic glass-and-glow visual language** (user request): dark theme default
+  (`#05070C` bg with two faint fixed radial-gradient glow blobs behind the top corners via
+  `body::before`), light theme toggle, Teko/Inter/IBM Plex Mono fonts, saffron/green
+  flag-bar accent on the logo only (no literal tricolor elsewhere). Surfaces that sit above
+  the base background (header, event cards, modals, menu dropdown, search dropdown, toasts)
+  use the `--glass`/`--glass-strong`/`--glass-border` tokens (translucent + `backdrop-filter:
+  blur(...)`) instead of flat opaque colors. Interactive/semantic accents (active chip,
+  `.btn.primary`/`.btn.danger`, winner player card, live match row, Start Match/Delete/Edit
+  mini-buttons, standings button) use the `--glow-saffron`/`--glow-win`/`--glow-live`/
+  `--glow-info` box-shadow tokens and small gradient fills rather than flat single colors.
+  `--radius`/`--radius-sm`/`--radius-lg` replace one-off `border-radius` pixel values on
+  cards/inputs/buttons (small fixed-pixel radii on true pills/circles, e.g. `.live-badge`,
+  `.icon-btn`, are left as-is). Every interactive element gets a `transition` using the
+  shared `--ease` curve, plus a hover lift (`translateY(-1px)`) and/or `:active { transform:
+  scale(0.96–0.98) }` press feedback — apply the same pattern to new buttons/cards rather
+  than leaving them static. This was a pure CSS pass — no class names, DOM structure, or JS
+  behavior changed, so don't assume a visual tweak here implies a behavior change too.
 - No "day filter" chips (removed by user request) — only sport filter chips remain.
 - No "ADMIN MODE" banner (removed by user request) — admin controls live inside the
   **☰ hamburger menu** (top-right), not as standalone header icons. The header itself
