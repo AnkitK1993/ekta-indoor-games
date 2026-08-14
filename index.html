@@ -872,6 +872,21 @@
         font-style: italic;
         font-weight: 500;
       }
+      .override-stale {
+        display: block;
+        font-size: 10px;
+        font-weight: 700;
+        color: var(--live);
+        cursor: pointer;
+        margin-top: 2px;
+        transition: opacity 0.2s var(--ease);
+      }
+      .override-stale:hover {
+        opacity: 0.8;
+      }
+      .override-stale:active {
+        transform: scale(0.97);
+      }
       .vs-sep {
         font-family: "Teko";
         font-size: 15px;
@@ -8940,6 +8955,22 @@
         );
       }
 
+      // Auto-computes a `manual` (group-standings) slot's player from live
+      // standings, ignoring any override -- shared by resolveSlot (which
+      // checks the override first) and staleOverrideSuggestion (which needs
+      // the auto value specifically to compare against an existing override).
+      // Returns null if the slot isn't a manual type or isn't resolvable yet
+      // (round incomplete, or a 3+-way tie).
+      function resolveManualSlotAuto(match, slot) {
+        if (!slot || slot.type !== "manual") return null;
+        const parsed = parseManualSlotName(slot.name);
+        const prefix = parsed ? stripFinalSuffix(match.round) : null;
+        if (!parsed || prefix === null) return null;
+        const round = findGroupStageRound(match.eventId, prefix, parsed.group);
+        const standings = round ? computeStandings(match.eventId, round) : null;
+        return (standings && standings[parsed.rank - 1]) || null;
+      }
+
       /* Recursively resolve a slot to a display object {name, age, isTbd, isWinnerOf} */
       function resolveSlot(match, slotKey) {
         const override = match["override" + slotKey];
@@ -8949,16 +8980,8 @@
         if (slot.type === "fixed")
           return { name: slot.name, age: slot.age, tbd: false };
         if (slot.type === "manual") {
-          const parsed = parseManualSlotName(slot.name);
-          const prefix = parsed ? stripFinalSuffix(match.round) : null;
-          if (parsed && prefix !== null) {
-            const round = findGroupStageRound(match.eventId, prefix, parsed.group);
-            const standings = round
-              ? computeStandings(match.eventId, round)
-              : null;
-            const player = standings && standings[parsed.rank - 1];
-            if (player) return { name: player.name, age: player.age, tbd: false };
-          }
+          const player = resolveManualSlotAuto(match, slot);
+          if (player) return { name: player.name, age: player.age, tbd: false };
           return { name: slot.name, age: null, tbd: true, manual: true };
         }
         if (slot.type === "placeholder") {
@@ -8974,6 +8997,27 @@
           return { name: "Winner of " + slot.ref, age: null, tbd: true };
         }
         return { name: "TBD", age: null, tbd: true };
+      }
+
+      // An override always wins over auto-resolution (by design -- e.g. a
+      // walkover substitute who isn't in any group standings at all), so it's
+      // never overwritten automatically. But a manual (group-standings) slot
+      // is commonly overridden *while it's still ambiguous* (an unplayed
+      // round, or a tie the auto-resolver can't break) and then forgotten --
+      // once that round finishes cleanly, the override silently keeps
+      // showing the old guess forever instead of the now-known-correct
+      // player, with no indication anything's off. This flags that specific
+      // situation for the admin (see the "⚠" badge in playerHtml below) --
+      // an override on a manual slot whose live standings now resolve
+      // cleanly to a *different* player -- without ever touching the data
+      // itself; the admin still has to tap to accept the correction.
+      function staleOverrideSuggestion(match, slotKey) {
+        const override = match["override" + slotKey];
+        if (!override) return null;
+        const slot = match["player" + slotKey];
+        const player = resolveManualSlotAuto(match, slot);
+        if (player && player.name !== override) return player;
+        return null;
       }
 
       // A match's own `status`/`winnerSlot` fields are frozen at the moment
@@ -10009,35 +10053,37 @@
         .addEventListener("click", () =>
           document.getElementById("edit-modal").classList.remove("show"),
         );
-      document.getElementById("edit-save").addEventListener("click", () => {
-        const val = document.getElementById("edit-name-input").value.trim();
-        const target = state.currentEditTarget;
-        if (!target || !val) return;
-        const field = "override" + target.slotKey;
+      // If this slot is the winner or loser of an already-completed match, a
+      // name correction (whether typed in the edit modal or accepted via the
+      // stale-override suggestion badge) needs to also update the frozen
+      // winnerName/loserName fields -- resolveSlot's `placeholder` branch
+      // (for a next-round match, e.g. a Final referencing this semifinal)
+      // reads those frozen fields directly rather than re-resolving this
+      // match's slots live, so without this it would keep showing the
+      // pre-edit name downstream even though this match's own card now
+      // displays the corrected one.
+      function saveSlotOverride(matchId, slotKey, val) {
+        const field = "override" + slotKey;
         const patch = { [field]: val, updatedAt: serverTimestamp() };
-        // If this slot is the winner or loser of an already-completed match,
-        // a later name correction here (via ✎ edit) needs to also update the
-        // frozen winnerName/loserName fields -- resolveSlot's `placeholder`
-        // branch (for a next-round match, e.g. a Final referencing this
-        // semifinal) reads those frozen fields directly rather than
-        // re-resolving this match's slots live, so without this it would
-        // keep showing the pre-edit name downstream even though this
-        // match's own card now displays the corrected one.
-        const match = state.matchesById[target.matchId];
+        const match = state.matchesById[matchId];
         if (match && match.status === "completed") {
-          if (match.winnerSlot === target.slotKey) {
+          if (match.winnerSlot === slotKey) {
             patch.winnerName = val;
             patch.winnerAge = null;
           } else {
             patch.loserName = val;
           }
         }
-        setDoc(doc(db, "matches", target.matchId), patch, {
-          merge: true,
-        }).catch((e) => {
+        setDoc(doc(db, "matches", matchId), patch, { merge: true }).catch((e) => {
           console.error(e);
           toast("⚠️ Couldn't save name — please try again", "error");
         });
+      }
+      document.getElementById("edit-save").addEventListener("click", () => {
+        const val = document.getElementById("edit-name-input").value.trim();
+        const target = state.currentEditTarget;
+        if (!target || !val) return;
+        saveSlotOverride(target.matchId, target.slotKey, val);
         document.getElementById("edit-modal").classList.remove("show");
       });
 
@@ -10118,10 +10164,15 @@
           const editBtn = state.isAdmin
             ? `<span style="font-size:10px;color:var(--info);margin-left:4px;" data-edit="${slotKey}">✎ edit</span>`
             : "";
+          const suggestion = state.isAdmin ? staleOverrideSuggestion(m, slotKey) : null;
+          const staleBtn = suggestion
+            ? `<span class="override-stale" data-applysuggestion="${slotKey}" data-suggestion="${escapeHtml(suggestion.name)}">⚠ Standings now say <b>${escapeHtml(suggestion.name)}</b> — tap to use</span>`
+            : "";
           return `<div class="${classes.join(" ")}" ${canTap ? `data-tapwinner="${slotKey}"` : ""} ${canView ? `data-viewplayer="${escapeHtml(resolved.name)}"` : ""}>
       <span>${resolved.name}${isWinner ? '<span class="trophy">🏆</span>' : ""}</span>
       ${resolved.age ? `<span class="age">Age ${resolved.age}</span>` : ""}
       ${editBtn}
+      ${staleBtn}
     </div>`;
         }
 
@@ -10177,6 +10228,7 @@
           matchEl.querySelectorAll("[data-tapwinner]").forEach((p) => {
             p.addEventListener("click", (e) => {
               if (e.target.closest("[data-edit]")) return;
+              if (e.target.closest("[data-applysuggestion]")) return;
               const slotKey = p.dataset.tapwinner;
               const isCurrentWinner =
                 match.status === "completed" && match.winnerSlot === slotKey;
@@ -10192,6 +10244,16 @@
               const slotKey = editEl.dataset.edit;
               const resolved = resolveSlot(match, slotKey);
               openEditModal(matchId, slotKey, resolved.name);
+            });
+          });
+          matchEl.querySelectorAll("[data-applysuggestion]").forEach((el) => {
+            el.addEventListener("click", (e) => {
+              e.stopPropagation();
+              saveSlotOverride(
+                matchId,
+                el.dataset.applysuggestion,
+                el.dataset.suggestion,
+              );
             });
           });
           matchEl.querySelectorAll("[data-action]").forEach((btn) => {

@@ -489,6 +489,25 @@ updates immediately as results come in and reverts immediately if a group match 
 un-completed. The `override` mechanism still takes precedence over everything (checked
 first in `resolveSlot`), so admin can always force a value manually if ever needed.
 
+- **Stale-override safeguard (user-reported bug):** a `manual` slot is commonly overridden
+  *while it's still ambiguous* (round not finished yet, or a 3+-way tie the auto-resolver
+  can't break) — e.g. Carrom Women's had a real 2-way tie for 2nd that got manually filled
+  in with a guess before the pool round was fully played. Once that round later finished
+  cleanly, the override kept silently showing the old guess forever instead of the
+  now-correctly-resolvable player, since overrides are never auto-revised (previous
+  paragraph). `staleOverrideSuggestion(match, slotKey)` detects this specific case — an
+  override on a `manual` slot whose live standings (via the new `resolveManualSlotAuto`,
+  factored out of `resolveSlot`'s manual branch so both share one code path) now resolve
+  cleanly to a *different* player — and `playerHtml` shows a small `⚠ Standings now say
+  <name> — tap to use` badge (`.override-stale`) next to that player's "✎ edit" link,
+  admin-only. Tapping it calls the same `saveSlotOverride` the edit modal's Save button
+  uses (also factored out, so both paths keep `winnerName`/`loserName` in sync if the slot
+  belongs to an already-completed match — see the edit-modal note below). This never writes
+  anything on its own; the whole point is that overrides remain admin-controlled and
+  intentional (a walkover substitute not in any standings is a legitimate permanent
+  override this must never flag or touch) — it just surfaces the mismatch instead of
+  leaving it silently wrong.
+
 - **Why this needed real design work, not a generic parser:** the manual slot *name* text
   uses 4 different templates across events (`"1st of Group A"` for tt_women only, `"Group A
   1st"` for most others, `"Pool 1st"` for single-pool brackets, `"Round Robin 1st"` for
