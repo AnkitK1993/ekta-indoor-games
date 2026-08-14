@@ -8217,6 +8217,19 @@
         return round;
       }
 
+      // Display-only: the underlying round-name data (and everything that
+      // parses it -- parseManualSlotName, findGroupStageRound, computeStandings,
+      // stripFinalSuffix, matchCategoryPrefix) keeps saying "Pool" exactly as
+      // stored (e.g. "Pool A"/"Pool B", "41 and above - Pool"), since that's
+      // the round-robin/group-stage naming convention baked into SEED_DATA.
+      // But showing the word "Pool" on a match card reads as "the Pool
+      // (billiards) event" to a user, since Pool is also a real event name --
+      // so anywhere a round name reaches the screen, swap just that word for
+      // "Group" without touching the stored string itself.
+      function formatRoundLabel(round) {
+        return round ? round.replace(/\bPool\b/g, "Group") : round;
+      }
+
       function squashDivision(match) {
         const code = match.code || "";
         if (code.startsWith("U15-")) {
@@ -8240,7 +8253,7 @@
       function matchDivision(m) {
         if (m.eventId === "squash") return squashDivision(m);
         return m.round
-          ? { label: m.round, className: "match-round-tag" }
+          ? { label: formatRoundLabel(m.round), className: "match-round-tag" }
           : { label: "", className: "" };
       }
 
@@ -8578,7 +8591,7 @@
                   ) {
                     const ev = eventById(m.eventId);
                     toast(
-                      `🏆 <span><b>${m.winnerName}</b> defeated ${m.loserName || "opponent"}<br><span style="color:var(--muted);font-size:11px;">${ev ? ev.name : m.eventId} — ${m.round}</span></span>`,
+                      `🏆 <span><b>${m.winnerName}</b> defeated ${m.loserName || "opponent"}<br><span style="color:var(--muted);font-size:11px;">${ev ? ev.name : m.eventId} — ${formatRoundLabel(m.round)}</span></span>`,
                     );
                     // hold at its normal spot for 5s (revert window) before it
                     // sinks to the bottom of its event's match pile
@@ -9193,7 +9206,7 @@
                 return `
         <div class="standings-group">
           <div class="standings-group-title">
-            <span>${round}</span>
+            <span>${formatRoundLabel(round)}</span>
             <span class="standings-group-status">${complete ? "Complete" : "In progress"}</span>
           </div>
           <table class="standings-table">
@@ -9757,10 +9770,9 @@
         html += matched
           .map((m) => {
             const ev = eventById(m.eventId);
-            const roundText =
-              ev && ev.id === "squash"
-                ? formatSquashRoundTag(m.round)
-                : m.round;
+            const roundText = formatRoundLabel(
+              ev && ev.id === "squash" ? formatSquashRoundTag(m.round) : m.round,
+            );
             return `<div class="event-card open" style="margin-bottom:10px;"><div class="event-body" style="border-top:none;">
       <div class="round-label">${ev ? ev.name : m.eventId} · ${roundText}</div>
       ${renderMatchRow(m)}
@@ -9891,10 +9903,9 @@
           ? playerMatches
               .map((m) => {
                 const ev = eventById(m.eventId);
-                const roundText =
-                  ev && ev.id === "squash"
-                    ? formatSquashRoundTag(m.round)
-                    : m.round;
+                const roundText = formatRoundLabel(
+                  ev && ev.id === "squash" ? formatSquashRoundTag(m.round) : m.round,
+                );
                 return `<div class="event-card open" style="margin-bottom:10px;"><div class="event-body" style="border-top:none;">
         <div class="round-label">${ev ? ev.name : m.eventId} · ${roundText}</div>
         ${renderMatchRow(m)}
