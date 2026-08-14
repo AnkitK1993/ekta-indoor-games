@@ -375,9 +375,12 @@ group/pool standings are tallied; they are not auto-computed from match results.
   Yes/No popup (`#confirm-winner-modal`, `openConfirmWinnerModal`, added by user request to
   replace the old instant-completion-plus-5-second-hold behavior) — "No"/✕ leaves the match
   untouched, "Yes" calls `confirmWinner` with that slot. Tapping the *current* winner again
-  still clears the result back to `"upcoming"` (`resetMatch`) instantly, no confirmation —
-  that part wasn't asked to change. Tapping the *other* player while one is already marked
-  opens the separate **"Switch Winner?"** confirm popup (`#switch-winner-modal`,
+  opens a **"Reset Result?"** confirm popup (`#reset-match-modal`, `openResetMatchModal`,
+  added by user request — this used to clear the result back to `"upcoming"` (`resetMatch`)
+  instantly with no confirmation, but that was changed since a mis-tap on the winner had no
+  safety net) — Cancel/✕ leaves the match untouched, "Reset" calls `resetMatch`. Tapping the
+  *other* player while one is already marked opens the separate **"Switch Winner?"** confirm
+  popup (`#switch-winner-modal`,
   `openSwitchWinnerModal`) rather than switching instantly — Cancel leaves it untouched,
   "Switch" calls `confirmWinner` with the new slot.
   This works identically whether the match is live, upcoming, or already completed — `canTap`

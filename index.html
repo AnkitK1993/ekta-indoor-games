@@ -1686,6 +1686,23 @@
       </div>
     </div>
 
+    <!-- Reset Result Confirm Modal -->
+    <div class="modal-overlay" id="reset-match-modal">
+      <div class="modal">
+        <button class="modal-close" id="reset-match-close">✕</button>
+        <h2>Reset Result?</h2>
+        <p class="sub" id="reset-match-sub"></p>
+        <div class="modal-actions">
+          <button class="btn ghost" id="reset-match-cancel" style="flex: 1">
+            Cancel
+          </button>
+          <button class="btn danger" id="reset-match-confirm" style="flex: 1">
+            Reset
+          </button>
+        </div>
+      </div>
+    </div>
+
     <!-- Delete Match Confirm Modal -->
     <div class="modal-overlay" id="delete-match-modal">
       <div class="modal">
@@ -9673,7 +9690,8 @@
       /* ===================== WINNER MARKING ===================== */
       // Tapping a player marks them the winner (or switches the winner to
       // them if the other slot was already marked). Tapping the current
-      // winner again clears the result. See attachMatchHandlers.
+      // winner again opens a Reset Result? confirm (see openResetMatchModal
+      // below) before clearing it. See attachMatchHandlers.
       function confirmWinner(match, slotKey) {
         const winner = resolveSlot(match, slotKey);
         const loserKey = slotKey === "A" ? "B" : "A";
@@ -9753,6 +9771,32 @@
           if (pendingSwitch)
             confirmWinner(pendingSwitch.match, pendingSwitch.slotKey);
           closeSwitchWinnerModal();
+        });
+
+      let pendingReset = null; // match awaiting confirm in reset-match-modal
+      function openResetMatchModal(match) {
+        const current = resolveSlot(match, match.winnerSlot);
+        pendingReset = match;
+        const label = match.matchNumber ? `Match ${match.matchNumber}` : match.code;
+        document.getElementById("reset-match-sub").textContent =
+          `Clear ${current.name} as the winner of ${label}?`;
+        document.getElementById("reset-match-modal").classList.add("show");
+      }
+      function closeResetMatchModal() {
+        document.getElementById("reset-match-modal").classList.remove("show");
+        pendingReset = null;
+      }
+      document
+        .getElementById("reset-match-close")
+        .addEventListener("click", closeResetMatchModal);
+      document
+        .getElementById("reset-match-cancel")
+        .addEventListener("click", closeResetMatchModal);
+      document
+        .getElementById("reset-match-confirm")
+        .addEventListener("click", () => {
+          if (pendingReset) resetMatch(pendingReset);
+          closeResetMatchModal();
         });
 
       function setMatchStatus(match, status) {
@@ -10136,7 +10180,7 @@
               const slotKey = p.dataset.tapwinner;
               const isCurrentWinner =
                 match.status === "completed" && match.winnerSlot === slotKey;
-              if (isCurrentWinner) resetMatch(match);
+              if (isCurrentWinner) openResetMatchModal(match);
               else if (match.status === "completed")
                 openSwitchWinnerModal(match, slotKey);
               else openConfirmWinnerModal(match, slotKey);
