@@ -8690,14 +8690,24 @@
       // Kids/15-25/Above-25 bracket naming) -- every other event's pill just
       // shows the round text itself. Color is handled separately, generically,
       // by matchDivisionHue below, for every event including squash.
+      // Every bracket's Final (and Kids' Semifinal) shares the same code
+      // prefix as its own pool/round-1 matches (e.g. "U15-FINAL" and
+      // "U15-R1-M1" both start with "U15-"), so the base label alone can't
+      // tell a Final apart from an earlier match in the same bracket --
+      // append the stage so it reads "Kids Final" / "Above 25 Semifinal"
+      // instead of just "Kids" on every card in that bracket alike.
       function squashDivisionLabel(match) {
         const code = match.code || "";
-        if (code.startsWith("U15-")) return "Kids";
-        if (code.startsWith("GA-")) return "Group A";
-        if (code.startsWith("GB-")) return "Group B";
-        if (code.startsWith("GC-")) return "15-25";
-        if (code.startsWith("A25-")) return "Above 25";
-        return "";
+        let base = "";
+        if (code.startsWith("U15-")) base = "Kids";
+        else if (code.startsWith("GA-")) base = "Group A";
+        else if (code.startsWith("GB-")) base = "Group B";
+        else if (code.startsWith("GC-")) base = "15-25";
+        else if (code.startsWith("A25-")) base = "Above 25";
+        else return "";
+        if (isFinalRound(match.round)) return base + " Final";
+        if (isSemifinalRound(match.round)) return base + " Semifinal";
+        return base;
       }
 
       // A match's age-band prefix (matchCategoryPrefix) plus, only while it's
@@ -10499,11 +10509,14 @@
         return round.endsWith(" - Final");
       }
       // Same shape as isFinalRound but for the semifinal round -- bare
-      // "Semifinal" for single-bracket events, or "<band/bracket> -
-      // Semifinal" for age-banded ones (e.g. "Under 46 - Semifinal").
+      // "Semifinal" for single-bracket events, "<band/bracket> - Semifinal"
+      // for age-banded ones (e.g. "Under 46 - Semifinal"), or squash's
+      // kids-bracket semifinal code ("U15-SF") -- isFinalRound already
+      // special-cases squash's "U15-F"/"U15-FINAL", this was missing the
+      // equivalent for the semifinal round one level up the same bracket.
       function isSemifinalRound(round) {
         if (!round) return false;
-        if (round === "Semifinal") return true;
+        if (round === "Semifinal" || round === "U15-SF") return true;
         return round.endsWith(" - Semifinal");
       }
       // null for a single-winner event (plain "Final", no label needed);
