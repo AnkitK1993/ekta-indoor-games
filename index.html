@@ -9189,7 +9189,16 @@
         if (slot.type === "placeholder") {
           const refId = match.eventId + "_" + slot.ref;
           const refMatch = state.matchesById[refId];
-          if (refMatch && refMatch.winnerName) {
+          // isMatchResolvedComplete, not just refMatch.winnerName truthy:
+          // the referenced match's own manual/placeholder slots can
+          // un-resolve after it was marked completed (e.g. its group stage
+          // gets reset and replayed with a different result), which
+          // already correctly hides ITS OWN trophy -- but winnerName
+          // itself is a frozen field that isn't cleared just by its
+          // dependency un-resolving, only by an explicit resetMatch. A
+          // downstream Final's "Winner of SF1" must not trust that stale
+          // frozen name once SF1 itself no longer counts as resolved.
+          if (refMatch && isMatchResolvedComplete(refMatch) && refMatch.winnerName) {
             return {
               name: refMatch.winnerName,
               age: refMatch.winnerAge || null,
