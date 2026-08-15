@@ -8,14 +8,18 @@ names, and import/export the whole dataset as JSON.
 ## Firebase project
 - Project ID: `ekta-indoor-games-80208`
 - Config is already embedded in `index.html` (top of the module script).
-- Firestore security rules are in `firestore.rules` — public read, auth-required write.
-  Paste into Firebase Console → Firestore → Rules.
+- Firestore security rules are in `firestore.rules` — public read, auth-required write,
+  **except `playerPhones`, which is auth-required for both read and write** (phone
+  numbers are more sensitive than the rest of this app's data — see `playerPhones`
+  below). Paste into Firebase Console → Firestore → Rules — rules changes don't
+  auto-deploy from this repo, that paste step has to be redone by hand every time
+  this file changes.
 - Auth: Email/Password provider. Admin user: `ankit.konchady@et.com` / `ekta123`
   (created manually in Firebase Console → Authentication → Users).
-- Collections: `events`, `matches`, `pendingPlayers`, `playerPayments`. No Cloud
-  Functions — all logic (bracket auto-advance, winner resolution) happens client-side
-  by resolving `{type:"placeholder", ref:"M3"}` slots against sibling matches in the
-  same event.
+- Collections: `events`, `matches`, `pendingPlayers`, `playerPayments`, `playerPhones`.
+  No Cloud Functions — all logic (bracket auto-advance, winner resolution) happens
+  client-side by resolving `{type:"placeholder", ref:"M3"}` slots against sibling
+  matches in the same event.
 - **Multi-admin write pattern (3-4 admins expected to edit concurrently, all
   sharing the one login above — no per-admin accounts):** every match/payment
   write is `setDoc(ref, {...changedFieldsOnly}, {merge:true})`, fire-and-forget
@@ -24,7 +28,7 @@ names, and import/export the whole dataset as JSON.
   promises only resolve on server ack and hang (don't reject) while offline,
   so gating UI on `await` would leave modals stuck open when a phone briefly
   loses signal — see `confirmWinner`, `setMatchStatus`, `resetMatch`, the
-  `#edit-save` handler, `setPlayerPayment`. `db` is created via
+  `#edit-save` handler, `setPlayerPhone`. `db` is created via
   `initializeFirestore(fbApp, {localCache: persistentLocalCache({tabManager:
   persistentSingleTabManager()})})`, not plain `getFirestore`, so writes queue
   in IndexedDB and survive a dropped connection or reload. Last-write-wins is
@@ -130,12 +134,36 @@ names, and import/export the whole dataset as JSON.
 - `pendingPlayers`: `{eventId: [{name, age}, ...]}` — rosters for events not yet bracketed.
   Currently empty (`{}`) — every event has already been fully bracketed into matches.
 - `playerPayments`: one doc per unique player/pair name (doc ID = name, with any `/`
-  swapped for `-`), `{name, paid: boolean, updatedAt}`. Written only from the admin
-  "Players Master" screen; a player with no doc is treated as `paid: false` (UNPAID
-  is the default, not an explicit state). Keyed by the exact display name string used
-  in `playerA`/`playerB` `fixed`/`resolved` slots — doubles pairs are one combined
-  name (e.g. `"Tanmay Sharma & Sankalp"`), so payment is tracked per pair, not per
-  individual, consistent with how search already treats names.
+  swapped for `-`), `{name, paid: boolean, updatedAt}`. **No longer surfaced in the UI**
+  (the PAID/UNPAID badge in Players Master was removed by user request and replaced
+  with phone numbers, see `playerPhones` below) — the collection, its `onSnapshot`
+  listener (`state.playerPayments`), and the rename-migration logic are all still
+  live (kept for the automated Firestore backup and in case it's wanted back), just
+  nothing renders or writes `paid` from the app anymore. Was keyed by the exact
+  display name string used in `playerA`/`playerB` `fixed`/`resolved` slots — doubles
+  pairs were one combined name (e.g. `"Tanmay Sharma & Sankalp"`).
+- `playerPhones`: one doc per unique player/pair name (same doc-ID convention as
+  `playerPayments` — exact display name, `/` swapped for `-`), `{name, phone,
+  updatedAt}`. Shown (and editable, with a copy-to-clipboard button) on each
+  player's Players Master detail card, where the old PAID/UNPAID badge used to be;
+  the player-list rows show a compact phone preview instead of a payment badge.
+  **Deliberately more locked-down than every other collection**: `firestore.rules`
+  restricts `playerPhones` to authenticated-only `read` *and* `write` (every other
+  collection is public-read), since phone numbers are meaningfully more sensitive
+  PII than schedule/results — this app's Firestore is otherwise fully public-read
+  by design, so anyone with the project ID can already query matches/events/payments
+  directly (no auth needed), which phone numbers deliberately opt out of. Because of
+  this, `state.playerPhones` is only ever populated while signed in — `startPhoneListener()`/
+  `stopPhoneListener()` start and tear down its `onSnapshot` listener from inside
+  `onAuthStateChanged` (a signed-out client would otherwise get a permission-denied
+  error attempting to read it), and `refreshOnVisible()`'s one-shot re-fetch only
+  includes `playerPhones` when `state.isAdmin`. **Firestore rules changes don't
+  auto-deploy** — same as the original public-read rule, this has to be manually
+  re-pasted into Firebase Console → Firestore → Rules to take effect; the app-side
+  code assumes that's been done. Pre-seeded from ~130 real phone numbers already
+  present (but previously unused) in `Ekta Indoor Events.xlsx`'s "Phone number"
+  column, matched against the tournament's actual player names; doubles pairs got
+  both partners' numbers joined with " / " where both were resolvable.
 
 ## Status of each event
 All 9 events are `"ready"` with full brackets built (297 matches total).
@@ -342,9 +370,13 @@ group/pool standings are tallied; they are not auto-computed from match results.
   and opens its existing modal/view; don't reintroduce these as separate header icons.
   "👥 Players Master" opens a full-screen roster view (`#players-master-view`) with a
   search box over every unique player/pair name (built from resolved match slots +
-  `pendingPlayers`, excluding anything still `tbd`/`manual`). Tapping a name shows that
-  player's full schedule + results (same match-card rendering as search results) plus a
-  tappable PAID/UNPAID badge that opens a small popup to set `playerPayments`.
+  `pendingPlayers`, excluding anything still `tbd`/`manual`). The list rows show a
+  compact phone-number preview (or "No phone" in italics) next to each name. Tapping
+  a name shows that player's full schedule + results (same match-card rendering as
+  search results) plus their phone number as a chip with copy (📋) and edit (✎)
+  buttons — or a "+ Add phone" button if none is on file yet — which opens a small
+  popup to set `playerPhones`. (This chip replaced a tappable PAID/UNPAID badge that
+  used to live in the same spot — see `playerPayments` vs `playerPhones` above.)
   **"✎ Edit Name" renames a player everywhere** (user request) — since a name isn't stored
   once in a central player record but denormalized into every `fixed` `playerA`/`playerB`
   slot the player appears in (each match carries its own `{name, age}` copy), a rename has
@@ -356,9 +388,10 @@ group/pool standings are tallied; they are not auto-computed from match results.
   used to preview the affected match count before the admin confirms);
   `renamePlayerEverywhere` commits it via `writeBatch` (chunked at 450 ops, same pattern as
   the Import/Export override flow), fire-and-forget like every other match write. The
-  `playerPayments` doc is keyed by name (doc ID), so renaming creates a new doc under the
-  new ID and deletes the old one rather than patching a field; a player with no payment
-  record (defaults to UNPAID) has nothing to carry over. A **"Rename Player?"** confirm
+  `playerPayments`/`playerPhones` docs are keyed by name (doc ID), so renaming creates a
+  new doc under the new ID and deletes the old one rather than patching a field for
+  either; a player with no existing record in one (or both) has nothing to carry over
+  there. A **"Rename Player?"** confirm
   (`#pm-rename-confirm-modal`) shows the affected match count before committing — same
   safety-net pattern as the match-level edit confirms — and warns (without blocking) if the
   new name already belongs to a different existing player, since that would merge their
@@ -601,3 +634,10 @@ first in `resolveSlot`), so admin can always force a value manually if ever need
   "ADMIN MODE" banner, the live ticker banner, or the "Mark Result"/"Edit
   Result"/"Reset" buttons — all were deliberately removed.
 - Don't change the Firebase config or admin credentials without being asked.
+- Don't reintroduce the PAID/UNPAID payment badge/button in Players Master —
+  deliberately replaced with phone numbers (`playerPhones`). The underlying
+  `playerPayments` data/listener/rename-migration were kept, just not
+  rendered; don't wire it back into the UI without being asked.
+- Don't relax `playerPhones`' auth-required read rule back to public —
+  deliberately locked down (unlike every other collection) since phone
+  numbers are more sensitive than schedule/results.

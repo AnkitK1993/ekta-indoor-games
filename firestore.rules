@@ -2,9 +2,31 @@ rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
 
-    // Anyone with the link can READ everything (schedule, matches, players)
-    // Only the signed-in admin can WRITE (mark winners, start live, seed data)
-    match /{document=**} {
+    // Firestore combines ALL matching `match` blocks for a path with OR --
+    // a more specific match does NOT override a broader one the way you
+    // might expect from e.g. CSS specificity or routing. So playerPhones
+    // can't be "carved out" as an exception underneath a blanket
+    // {document=**} rule (that wildcard would still match it and grant
+    // public read regardless); each collection is listed explicitly
+    // instead, with playerPhones the one deliberately locked to
+    // authenticated-only read+write since it's more sensitive than the
+    // rest of this app's data (schedule/results are meant to be public).
+    match /playerPhones/{docId} {
+      allow read, write: if request.auth != null;
+    }
+    match /events/{docId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    match /matches/{docId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    match /pendingPlayers/{docId} {
+      allow read: if true;
+      allow write: if request.auth != null;
+    }
+    match /playerPayments/{docId} {
       allow read: if true;
       allow write: if request.auth != null;
     }

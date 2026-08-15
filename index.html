@@ -1242,32 +1242,55 @@
       .pm-rename-link:hover {
         text-decoration: underline;
       }
-      .payment-badge {
-        font-size: 10px;
-        font-weight: 700;
-        padding: 5px 12px;
-        border-radius: 20px;
-        text-transform: uppercase;
-        letter-spacing: 0.05em;
+      .pm-phone-preview {
+        font-size: 11.5px;
+        font-family: "IBM Plex Mono";
+        color: var(--muted);
         flex: 0 0 auto;
+      }
+      .pm-phone-preview.unset {
+        font-style: italic;
+        opacity: 0.6;
+      }
+      .phone-chip {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        background: var(--surface3);
+        border-radius: 20px;
+        padding: 6px 6px 6px 14px;
+        flex: 0 0 auto;
+      }
+      .phone-chip-number {
+        font-size: 13px;
+        font-weight: 600;
+        color: var(--text);
+      }
+      .phone-chip-btn {
+        width: 26px;
+        height: 26px;
+        border-radius: 50%;
         border: none;
-      }
-      .payment-badge.paid {
-        background: var(--win-dim);
-        color: var(--win);
-        box-shadow: 0 0 0 1px rgba(47, 191, 113, 0.22);
-      }
-      .payment-badge.unpaid {
-        background: var(--live-dim);
-        color: var(--live);
-        box-shadow: 0 0 0 1px rgba(255, 107, 53, 0.22);
-      }
-      .payment-badge.tappable {
+        background: var(--surface2);
+        color: var(--muted);
+        font-size: 12px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
         cursor: pointer;
-        transition: transform 0.2s var(--ease);
+        transition: all 0.2s var(--ease);
       }
-      .payment-badge.tappable:hover {
-        transform: translateY(-1px) scale(1.03);
+      .phone-chip-btn:hover {
+        color: var(--saffron-bright);
+        transform: translateY(-1px);
+      }
+      .phone-chip-btn:active {
+        transform: scale(0.92);
+      }
+      .pm-phone-add-btn {
+        flex: 0 0 auto;
+        padding: 8px 14px;
+        font-size: 12px;
       }
       .player-stats-grid {
         display: grid;
@@ -1882,39 +1905,22 @@
       </div>
     </div>
 
-    <!-- Payment Status Modal -->
-    <div class="modal-overlay" id="payment-modal">
+    <!-- Phone Number Modal -->
+    <div class="modal-overlay" id="phone-modal">
       <div class="modal">
-        <button class="modal-close" id="payment-close">✕</button>
-        <h2>Payment Status</h2>
-        <p class="sub" id="payment-modal-sub"></p>
+        <button class="modal-close" id="phone-close">✕</button>
+        <h2>Phone Number</h2>
+        <p class="sub" id="phone-modal-sub"></p>
         <div class="field">
-          <label>Mark As</label>
-          <div style="display: flex; flex-direction: column; gap: 8px">
-            <button
-              class="btn"
-              id="payment-mark-paid"
-              style="
-                background: var(--win);
-                color: #fff;
-                text-align: left;
-                padding: 12px;
-              "
-            >
-              ✓ PAID
-            </button>
-            <button
-              class="btn ghost"
-              id="payment-mark-unpaid"
-              style="text-align: left; padding: 12px"
-            >
-              UNPAID
-            </button>
-          </div>
+          <label>Phone</label>
+          <input type="tel" id="phone-input" placeholder="e.g. 9876543210" />
         </div>
         <div class="modal-actions">
-          <button class="btn ghost" id="payment-cancel" style="flex: 1">
+          <button class="btn ghost" id="phone-cancel" style="flex: 1">
             Cancel
+          </button>
+          <button class="btn primary" id="phone-save" style="flex: 1">
+            Save
           </button>
         </div>
       </div>
@@ -8686,10 +8692,11 @@
         firstSnapshotDone: false,
         currentEditTarget: null, // {matchId, slotKey}
         playerPayments: {}, // player name -> {name, paid, updatedAt}
+        playerPhones: {}, // player name -> {name, phone, updatedAt} -- admin-only (see firestore.rules), only populated while signed in
         showPlayersMaster: false,
         pmSearchQuery: "",
         pmSelectedPlayer: null, // player name, or null when showing the list
-        pmPaymentTarget: null, // player name the payment modal is open for
+        pmPhoneTarget: null, // player name the phone-number modal is open for
         pmRenameTarget: null, // player name the rename modal is open for
         viewPlayerName: null, // non-admin: player whose profile (stats + schedule) is open, or null
       };
@@ -9349,7 +9356,8 @@
 
       let unsubMatches = null,
         unsubEvents = null,
-        unsubPayments = null;
+        unsubPayments = null,
+        unsubPhones = null;
 
       function normalizeEvents(events) {
         return events.map((event) => normalizeEvent({ ...event }));
@@ -9440,6 +9448,40 @@
           },
         );
       }
+
+      // playerPhones is locked to authenticated-only read in firestore.rules
+      // (unlike every other collection here, which is public-read) since
+      // phone numbers are more sensitive than schedule/results -- so unlike
+      // startListeners' other subscriptions, this one must only run while
+      // actually signed in as admin, or a signed-out visitor's browser
+      // would get a permission-denied error from Firestore on every load.
+      // Wired to onAuthStateChanged below: started on sign-in, torn down
+      // (and the in-memory copy cleared) on sign-out.
+      function startPhoneListener() {
+        if (unsubPhones) return;
+        unsubPhones = onSnapshot(
+          collection(db, "playerPhones"),
+          (snap) => {
+            const map = {};
+            snap.docs.forEach((d) => {
+              const data = d.data();
+              map[data.name || d.id] = data;
+            });
+            state.playerPhones = map;
+            render();
+          },
+          (err) => {
+            console.warn("playerPhones listener error", err);
+          },
+        );
+      }
+      function stopPhoneListener() {
+        if (unsubPhones) {
+          unsubPhones();
+          unsubPhones = null;
+        }
+        state.playerPhones = {};
+      }
       startListeners();
 
       // Mobile browsers can suspend a backgrounded tab's WebSocket, so a
@@ -9453,11 +9495,16 @@
         if (visibilityRefreshInFlight) return;
         visibilityRefreshInFlight = true;
         try {
-          const [evSnap, mSnap, pSnap] = await Promise.all([
+          const fetches = [
             getDocs(collection(db, "events")),
             getDocs(collection(db, "matches")),
             getDocs(collection(db, "playerPayments")),
-          ]);
+          ];
+          // playerPhones is admin-only read (see firestore.rules) -- only
+          // fetch it while actually signed in, same reasoning as
+          // startPhoneListener.
+          if (state.isAdmin) fetches.push(getDocs(collection(db, "playerPhones")));
+          const [evSnap, mSnap, pSnap, phSnap] = await Promise.all(fetches);
           if (!evSnap.empty) {
             state.events = normalizeEvents(
               evSnap.docs.map((d) => ({ id: d.id, ...d.data() })),
@@ -9481,6 +9528,14 @@
             map[data.name || d.id] = data;
           });
           state.playerPayments = map;
+          if (phSnap) {
+            const phoneMap = {};
+            phSnap.docs.forEach((d) => {
+              const data = d.data();
+              phoneMap[data.name || d.id] = data;
+            });
+            state.playerPhones = phoneMap;
+          }
           render();
         } catch (e) {
           console.warn("visibility refresh failed", e);
@@ -9494,6 +9549,8 @@
       /* ===================== ADMIN AUTH ===================== */
       onAuthStateChanged(auth, (user) => {
         state.isAdmin = !!user;
+        if (state.isAdmin) startPhoneListener();
+        else stopPhoneListener();
         renderAdminBanner();
         render();
       });
@@ -11071,9 +11128,12 @@
         return name.replace(/\//g, "-").trim();
       }
 
-      function isPlayerPaid(name) {
-        const rec = state.playerPayments[name];
-        return !!(rec && rec.paid);
+      // playerPhones only ever has data while signed in (admin-only read,
+      // see firestore.rules/startPhoneListener) -- a signed-out state (or
+      // a player with no phone on file yet) both just fall through to "".
+      function playerPhoneOf(name) {
+        const rec = state.playerPhones[name];
+        return (rec && rec.phone) || "";
       }
 
       function collectAllPlayerNames() {
@@ -11201,10 +11261,10 @@
 
         listEl.innerHTML = filtered
           .map((name, i) => {
-            const paid = isPlayerPaid(name);
+            const phone = playerPhoneOf(name);
             return `<div class="pm-row" data-idx="${i}">
         <span class="pm-name">${escapeHtml(name)}</span>
-        <span class="payment-badge ${paid ? "paid" : "unpaid"}">${paid ? "PAID" : "UNPAID"}</span>
+        <span class="pm-phone-preview ${phone ? "" : "unset"}">${phone ? escapeHtml(phone) : "No phone"}</span>
       </div>`;
           })
           .join("");
@@ -11224,7 +11284,7 @@
         detailEl.style.display = "block";
 
         const name = state.pmSelectedPlayer;
-        const paid = isPlayerPaid(name);
+        const phone = playerPhoneOf(name);
 
         detailEl.innerHTML = `
     <button class="pm-back-inline" id="pm-detail-back">← All players</button>
@@ -11233,7 +11293,15 @@
         <div class="pm-player-name">${escapeHtml(name)}</div>
         <span class="pm-rename-link" id="pm-rename-btn">✎ Edit Name</span>
       </div>
-      <button class="payment-badge tappable ${paid ? "paid" : "unpaid"}" id="pm-payment-btn">${paid ? "✓ PAID" : "UNPAID"}</button>
+      ${
+        phone
+          ? `<div class="phone-chip">
+        <span class="phone-chip-number mono">${escapeHtml(phone)}</span>
+        <button class="phone-chip-btn" id="pm-phone-copy-btn" title="Copy phone number">📋</button>
+        <button class="phone-chip-btn" id="pm-phone-edit-btn" title="Edit phone number">✎</button>
+      </div>`
+          : `<button class="btn ghost pm-phone-add-btn" id="pm-phone-edit-btn">+ Add phone</button>`
+      }
     </div>
     ${playerStatsHtml(name)}
     <div class="section-title" style="margin-top:18px;">Schedule &amp; Results<div class="rule"></div></div>
@@ -11246,16 +11314,20 @@
             render();
           });
         document
-          .getElementById("pm-payment-btn")
-          .addEventListener("click", () => openPaymentModal(name));
-        document
           .getElementById("pm-rename-btn")
           .addEventListener("click", () => openRenameModal(name));
+        document
+          .getElementById("pm-phone-edit-btn")
+          .addEventListener("click", () => openPhoneModal(name));
+        const copyBtn = document.getElementById("pm-phone-copy-btn");
+        if (copyBtn)
+          copyBtn.addEventListener("click", () => copyPhoneNumber(phone));
         attachMatchHandlers(detailEl);
       }
 
       // Non-admin equivalent of the Players Master detail view (read-only --
-      // no payment badge), reached by tapping a player's name directly on a
+      // no phone number, which is admin-only data anyway per
+      // firestore.rules), reached by tapping a player's name directly on a
       // match card instead of via the admin-only hamburger menu.
       function renderPlayerProfileView() {
         const name = state.viewPlayerName;
@@ -11283,52 +11355,47 @@
           renderPlayerListView();
         });
 
-      /* ===================== PAYMENT MODAL ===================== */
-      function openPaymentModal(name) {
-        state.pmPaymentTarget = name;
-        const paid = isPlayerPaid(name);
-        document.getElementById("payment-modal-sub").textContent =
-          `${name} — currently ${paid ? "PAID" : "UNPAID"}`;
-        document.getElementById("payment-modal").classList.add("show");
+      /* ===================== PHONE NUMBER MODAL ===================== */
+      function openPhoneModal(name) {
+        state.pmPhoneTarget = name;
+        document.getElementById("phone-modal-sub").textContent = name;
+        document.getElementById("phone-input").value = playerPhoneOf(name);
+        document.getElementById("phone-modal").classList.add("show");
       }
-      function closePaymentModal() {
-        document.getElementById("payment-modal").classList.remove("show");
-        state.pmPaymentTarget = null;
+      function closePhoneModal() {
+        document.getElementById("phone-modal").classList.remove("show");
+        state.pmPhoneTarget = null;
       }
-      function setPlayerPayment(name, paid) {
+      function setPlayerPhone(name, phone) {
         setDoc(
-          doc(db, "playerPayments", playerDocId(name)),
-          { name, paid, updatedAt: serverTimestamp() },
+          doc(db, "playerPhones", playerDocId(name)),
+          { name, phone, updatedAt: serverTimestamp() },
           { merge: true },
         ).catch((e) => {
           console.error(e);
-          toast("⚠️ Couldn't save payment status — please try again", "error");
+          toast("⚠️ Couldn't save phone number — please try again", "error");
         });
-        toast(
-          paid
-            ? `✅ <b>${escapeHtml(name)}</b> marked PAID`
-            : `<b>${escapeHtml(name)}</b> marked UNPAID`,
-        );
+        toast(`📞 Phone number saved for <b>${escapeHtml(name)}</b>`);
       }
+      function copyPhoneNumber(phone) {
+        navigator.clipboard
+          .writeText(phone)
+          .then(() => toast("📋 Phone number copied"))
+          .catch(() => toast("⚠️ Couldn't copy — copy it manually", "error"));
+      }
+      document.getElementById("phone-save").addEventListener("click", () => {
+        if (state.pmPhoneTarget) {
+          const phone = document.getElementById("phone-input").value.trim();
+          setPlayerPhone(state.pmPhoneTarget, phone);
+        }
+        closePhoneModal();
+      });
       document
-        .getElementById("payment-mark-paid")
-        .addEventListener("click", () => {
-          if (state.pmPaymentTarget) setPlayerPayment(state.pmPaymentTarget, true);
-          closePaymentModal();
-        });
+        .getElementById("phone-close")
+        .addEventListener("click", closePhoneModal);
       document
-        .getElementById("payment-mark-unpaid")
-        .addEventListener("click", () => {
-          if (state.pmPaymentTarget)
-            setPlayerPayment(state.pmPaymentTarget, false);
-          closePaymentModal();
-        });
-      document
-        .getElementById("payment-close")
-        .addEventListener("click", closePaymentModal);
-      document
-        .getElementById("payment-cancel")
-        .addEventListener("click", closePaymentModal);
+        .getElementById("phone-cancel")
+        .addEventListener("click", closePhoneModal);
 
       /* ===================== RENAME PLAYER (Players Master) ===================== */
       // A player's name isn't stored once in a central player record -- it's
@@ -11378,6 +11445,7 @@
         const matchPatches = computeMatchRenamePatches(oldName, newName);
         const pendingRenames = computePendingPlayerRenames(oldName, newName);
         const oldPayment = state.playerPayments[oldName];
+        const oldPhone = state.playerPhones[oldName];
 
         const ops = [];
         matchPatches.forEach(({ matchId, patch }) =>
@@ -11401,6 +11469,18 @@
             }),
           );
           ops.push((b) => b.delete(doc(db, "playerPayments", playerDocId(oldName))));
+        }
+        // Same reasoning as playerPayments just above -- playerPhones is
+        // also keyed by name.
+        if (oldPhone) {
+          ops.push((b) =>
+            b.set(doc(db, "playerPhones", playerDocId(newName)), {
+              ...oldPhone,
+              name: newName,
+              updatedAt: serverTimestamp(),
+            }),
+          );
+          ops.push((b) => b.delete(doc(db, "playerPhones", playerDocId(oldName))));
         }
 
         Promise.all(
