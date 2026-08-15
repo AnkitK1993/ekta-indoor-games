@@ -276,6 +276,17 @@
       /* ===== Search ===== */
       .search-card {
         position: relative;
+        /* .search-card's own backdrop-filter makes it a stacking context,
+           which traps #search-dropdown's z-index:10 as a LOCAL ranking
+           among search-card's own children only -- outside search-card,
+           the whole card (dropdown included) then competes against later
+           siblings (.progress-row, .chip-row) as one atomic box with no
+           explicit z-index, so those later, non-positioned siblings paint
+           on top per normal DOM-order stacking, bleeding through the open
+           dropdown. Giving search-card its own explicit z-index here (any
+           value beats their unset/auto stacking) makes the whole card,
+           dropdown included, win against them regardless of DOM order. */
+        z-index: 5;
         margin-top: 16px;
         background: var(--glass);
         border: 1px solid var(--glass-border);
@@ -518,6 +529,11 @@
       .standings-table tbody tr:hover {
         background: rgba(255, 153, 51, 0.05);
       }
+      .standings-table tbody tr.winner-row td {
+        background: var(--win-dim);
+        color: var(--win);
+        font-weight: 700;
+      }
       .standings-table th {
         color: var(--muted);
         font-size: 10px;
@@ -532,6 +548,31 @@
       }
       .standings-table tbody tr:last-child td {
         border-bottom: none;
+      }
+      /* Round-by-round knockout ladder (Squash's Kids bracket) -- same
+         .standings-group wrapper as the P/W/L tables above it, but each
+         round is just a list of "A vs B" match lines since a knockout
+         round has no ranking to tabulate. */
+      .knockout-match {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 7px 8px;
+        font-size: 13px;
+        border-bottom: 1px solid var(--border);
+      }
+      .knockout-match:last-child {
+        border-bottom: none;
+      }
+      .knockout-vs {
+        color: var(--muted);
+        font-size: 10px;
+        font-family: "IBM Plex Mono";
+        text-transform: uppercase;
+      }
+      .knockout-winner {
+        font-weight: 700;
+        color: var(--win);
       }
       .standings-empty {
         color: var(--muted);
@@ -9058,6 +9099,64 @@
         );
       }
 
+      // Squash's Kids (U15) bracket is a straight knockout with no
+      // round-robin stage feeding it, so it never shows up in
+      // eventGroupStageRounds (that only discovers rounds referenced by a
+      // "manual" group-standings slot -- Kids matches instead chain
+      // together via "placeholder" refs) -- previously this meant the
+      // Standings modal showed nothing for Kids at all, even once every
+      // round had been played. A P/W/L table doesn't make sense for a
+      // single-elimination bracket anyway, so this renders a simple
+      // round-by-round results ladder instead, reusing the same
+      // .standings-group wrapper so it sits visually consistent with the
+      // 15-25/Above-25 bracket tables above it. Squash-specific (like
+      // squashDivisionLabel/formatSquashRoundTag) rather than generalized
+      // to every event's knockout-only bands (e.g. TT Men's Above 46) --
+      // matchCategoryPrefix isn't consistent enough across those other
+      // brackets' round names (their Quarterfinal round doesn't share a
+      // prefix with their own Semifinal/Final) to detect them the same way
+      // without risking a broken/split section, and only Squash's Kids
+      // bracket was asked for.
+      function squashKidsRoundsHtml() {
+        const rounds = new Map(); // round name -> matches[], Map insertion order == first-seen chronological order
+        state.matches
+          .filter((m) => m.eventId === "squash" && (m.round || "").startsWith("U15-"))
+          .sort(compareMatches)
+          .forEach((m) => {
+            if (!rounds.has(m.round)) rounds.set(m.round, []);
+            rounds.get(m.round).push(m);
+          });
+        if (!rounds.size) return "";
+        return [...rounds.entries()]
+          .map(([round, matches]) => {
+            const allDecided = matches.every((m) => isMatchResolvedComplete(m));
+            return `
+        <div class="standings-group">
+          <div class="standings-group-title">
+            <span>${formatSquashRoundTag(round)}</span>
+            <span class="standings-group-status">${allDecided ? "Complete" : "In progress"}</span>
+          </div>
+          <div class="knockout-results">
+            ${matches
+              .map((m) => {
+                const a = resolveSlot(m, "A"),
+                  b = resolveSlot(m, "B");
+                const decided = isMatchResolvedComplete(m);
+                const aWin = decided && m.winnerSlot === "A";
+                const bWin = decided && m.winnerSlot === "B";
+                return `<div class="knockout-match">
+              <span class="${aWin ? "knockout-winner" : ""}">${a.name}${aWin ? '<span class="trophy">🏆</span>' : ""}</span>
+              <span class="knockout-vs">vs</span>
+              <span class="${bWin ? "knockout-winner" : ""}">${b.name}${bWin ? '<span class="trophy">🏆</span>' : ""}</span>
+            </div>`;
+              })
+              .join("")}
+          </div>
+        </div>`;
+          })
+          .join("");
+      }
+
       // Auto-computes a `manual` (group-standings) slot's player from live
       // standings, ignoring any override -- shared by resolveSlot (which
       // checks the override first) and staleOverrideSuggestion (which needs
@@ -10012,11 +10111,20 @@
           ? `${ev.name} — Standings`
           : "Standings";
         const content = document.getElementById("standings-content");
-        content.innerHTML = rounds.length
+        const roundsHtml = rounds.length
           ? rounds
               .map((round) => {
                 const rows = computeGroupTable(eventId, round);
-                const complete = computeStandings(eventId, round) !== null;
+                // computeStandings ranks by wins, index 0 = the group's
+                // winner -- but it's null if the round isn't fully played
+                // yet, or if a 3+-way tie at the top can't be broken (no
+                // score data exists to break it, see computeStandings), so
+                // there isn't always a single winner to highlight even once
+                // "Complete".
+                const standings = computeStandings(eventId, round);
+                const complete = standings !== null;
+                const winnerName =
+                  standings && standings[0] ? standings[0].name : null;
                 if (!rows.length) return "";
                 return `
         <div class="standings-group">
@@ -10035,22 +10143,27 @@
             </thead>
             <tbody>
               ${rows
-                .map(
-                  (r) => `
-              <tr>
-                <td>${r.name}</td>
+                .map((r) => {
+                  const isWinner = r.name === winnerName;
+                  return `
+              <tr class="${isWinner ? "winner-row" : ""}">
+                <td>${r.name}${isWinner ? '<span class="trophy">🏆</span>' : ""}</td>
                 <td class="num">${r.played}</td>
                 <td class="num">${r.won}</td>
                 <td class="num">${r.lost}</td>
-              </tr>`,
-                )
+              </tr>`;
+                })
                 .join("")}
             </tbody>
           </table>
         </div>`;
               })
               .join("")
-          : `<div class="standings-empty">No group/pool standings for this event.</div>`;
+          : "";
+        const kidsHtml = eventId === "squash" ? squashKidsRoundsHtml() : "";
+        content.innerHTML =
+          roundsHtml + kidsHtml ||
+          `<div class="standings-empty">No group/pool standings for this event.</div>`;
         document.getElementById("standings-modal").classList.add("show");
       }
       document.getElementById("standings-close").addEventListener("click", () => {
@@ -10482,6 +10595,20 @@
         const ts = m.completedAt;
         return ts && typeof ts.toMillis === "function" ? ts.toMillis() : null;
       }
+      // A Final whose two players are both now known (its semifinal/group
+      // stage just resolved) but hasn't been completed yet -- the match
+      // court staff need to prioritize next, regardless of its nominally
+      // scheduled time. isFinalRound is declared further down this file,
+      // but function declarations are hoisted within the module, so it's
+      // already callable here.
+      function isFinalReady(m) {
+        return (
+          isFinalRound(m.round) &&
+          !isMatchResolvedComplete(m) &&
+          !resolveSlot(m, "A").tbd &&
+          !resolveSlot(m, "B").tbd
+        );
+      }
       function compareForEventPile(a, b) {
         const aBottom = isMatchResolvedComplete(a);
         const bBottom = isMatchResolvedComplete(b);
@@ -10492,7 +10619,15 @@
           if (at != null && bt != null) return bt - at;
           if (at != null) return -1;
           if (bt != null) return 1;
+          return compareMatches(a, b);
         }
+        // Still-active matches: a decided-but-unplayed Final floats to the
+        // very top, ahead of everything else still active (including live
+        // matches from earlier rounds) -- once the group/semifinal feeding
+        // it is decided, that's the highest-priority match in the event.
+        const aReady = isFinalReady(a);
+        const bReady = isFinalReady(b);
+        if (aReady !== bReady) return aReady ? -1 : 1;
         return compareMatches(a, b);
       }
 
