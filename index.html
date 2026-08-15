@@ -351,8 +351,15 @@
         left: 0;
         right: 0;
         top: calc(100% + 8px);
-        background: var(--glass-strong);
-        backdrop-filter: blur(20px) saturate(150%);
+        /* Solid, not the usual --glass-strong/backdrop-filter treatment --
+           this floats directly over page content (chips, progress bar)
+           with no dimming overlay behind it (unlike .modal, which sits on
+           its own full-screen scrim), so any translucency here reads as
+           literal bleed-through rather than a glass effect. Dropping
+           backdrop-filter entirely also removes the very stacking-context
+           mechanism that caused the chip-row/progress-bar overlap bug in
+           the first place. */
+        background: var(--surface2);
         border: 1px solid var(--glass-border);
         border-radius: var(--radius-lg);
         box-shadow: var(--shadow-lg);
