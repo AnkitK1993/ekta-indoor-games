@@ -10756,9 +10756,16 @@
           <span>${done} / ${total} matches played</span>
           <div class="progress-track"><div class="progress-fill" style="width:${total ? ((done / total) * 100).toFixed(1) : 0}%"></div></div>
         </div>`;
-              const resultsSummaryHtml = isFinished
-                ? eventResultsSummaryHtml(evMatches)
-                : "";
+              // eventResultsSummaryHtml already filters to just the finals
+              // that are individually decided (isMatchResolvedComplete &&
+              // isFinalRound) and returns "" if none are yet -- gating this
+              // on the whole *event* being isFinished meant a multi-bracket
+              // event's already-decided final (e.g. Squash's Kids, done
+              // long before Above 25's semis/final) got no trophy card
+              // until every other bracket in the event finished too. Each
+              // bracket's card now appears the moment that bracket's own
+              // final is decided, independent of the other brackets.
+              const resultsSummaryHtml = eventResultsSummaryHtml(evMatches);
               const standingsBtnHtml = eventGroupStageRounds(ev.id).length
                 ? `<div class="standings-btn-row"><button type="button" class="standings-btn" data-standings="${ev.id}">🏆 Standings</button></div>`
                 : "";
