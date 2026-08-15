@@ -10160,9 +10160,13 @@
               })
               .join("")
           : "";
+        // Kids leads off the modal, same as it leads off the youngest-band-
+        // first ordering everywhere else (Standings groups, division-pill
+        // colors) -- it's just not sorted in with roundsHtml via the same
+        // ageBandSortKey machinery since it isn't a round-robin round at all.
         const kidsHtml = eventId === "squash" ? squashKidsRoundsHtml() : "";
         content.innerHTML =
-          roundsHtml + kidsHtml ||
+          kidsHtml + roundsHtml ||
           `<div class="standings-empty">No group/pool standings for this event.</div>`;
         document.getElementById("standings-modal").classList.add("show");
       }
