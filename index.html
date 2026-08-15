@@ -8898,7 +8898,21 @@
 
       // Age-band/bracket key for a match, e.g. "Above 46", "Above 25 Bracket",
       // or "" for events with no age-band split at all (whole event is one
-      // category). Used to scope the edit-name suggestion list.
+      // category). Used to scope the edit-name suggestion list, the
+      // division-pill color (matchGroupIdentity/eventDivisionOrder), and
+      // the per-event bracket filter chips (eventBracketPrefixes).
+      // TT Men's Above 46 is the one band in the whole tournament that's a
+      // knockout instead of a gated group stage (see CLAUDE.md), so it has
+      // its own "Quarterfinal"/"Round 1" rounds alongside the usual
+      // Semifinal/Final -- without these two suffixes, those 5 matches
+      // fell through to "" and got silently miscategorized as belonging to
+      // no band at all (wrong color, excluded from the "Above 46" bracket
+      // filter, and too-broad edit-name suggestions), even though its own
+      // Semifinal/Final matches correctly resolved to "Above 46". Safe to
+      // add generally: the only other "Quarterfinal"/"Round 1" rounds in
+      // the tournament (tt_doubles, carrom_doubles) are bare strings with
+      // no age-band prefix before them, so they don't end with " - " and
+      // are unaffected.
       function matchCategoryPrefix(match) {
         const round = match.round || "";
         if (match.eventId === "squash" && round.startsWith("U15-")) return "U15";
@@ -8908,6 +8922,8 @@
           " - Group A",
           " - Group B",
           " - Pool",
+          " - Quarterfinal",
+          " - Round 1",
         ];
         for (const suf of suffixes) {
           if (round.endsWith(suf)) return round.slice(0, -suf.length);
