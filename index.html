@@ -492,6 +492,45 @@
       .standings-btn:active {
         transform: scale(0.97);
       }
+      /* Per-event age-bracket filter row -- sits right below the Standings
+         button, one chip per distinct bracket present in that event (see
+         eventBracketPrefixes), tapping one narrows the match list below to
+         just that bracket. */
+      .bracket-filter-row {
+        display: flex;
+        gap: 6px;
+        overflow-x: auto;
+        padding: 0 16px 10px;
+        scrollbar-width: none;
+      }
+      .bracket-filter-row::-webkit-scrollbar {
+        display: none;
+      }
+      .bracket-chip {
+        flex: 0 0 auto;
+        padding: 5px 11px;
+        border-radius: 20px;
+        border: 1px solid var(--glass-border);
+        background: var(--glass);
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 600;
+        white-space: nowrap;
+        transition: all 0.2s var(--ease);
+      }
+      .bracket-chip:hover {
+        border-color: rgba(255, 153, 51, 0.35);
+        color: var(--text);
+      }
+      .bracket-chip:active {
+        transform: scale(0.96);
+      }
+      .bracket-chip.all.active {
+        background: linear-gradient(135deg, var(--saffron), #ff7a1a);
+        color: #1a1006;
+        border-color: transparent;
+        box-shadow: 0 4px 16px rgba(255, 153, 51, 0.4);
+      }
       #standings-modal .modal {
         max-width: 560px;
       }
@@ -8638,6 +8677,7 @@
         theme: localStorage.getItem("ekta-theme") || "dark",
         filters: { day: "All", sport: "All" },
         openEvents: new Set(),
+        eventBracketFilter: {}, // eventId -> selected age-bracket prefix, or absent for "All"
         searchQuery: "",
         searchDropdownOpen: false,
         searchCloseMode: false,
@@ -8874,6 +8914,32 @@
         }
         return "";
       }
+
+      // Squash's Kids bracket uses the internal key "U15" (matchCategoryPrefix's
+      // own squash special-case, matching matchGroupIdentity/eventDivisionOrder)
+      // -- everywhere it reaches the screen it should read "Kids" instead, same
+      // as squashDivisionLabel's match-card pill.
+      function bracketDisplayLabel(eventId, prefix) {
+        if (eventId === "squash" && prefix === "U15") return "Kids";
+        return prefix;
+      }
+
+      // Every distinct age-band/bracket a given event's matches actually fall
+      // into (via matchCategoryPrefix), youngest-first -- "" (no age split at
+      // all, e.g. tt_doubles/carrom_doubles/carrom_women/tt_women) means no
+      // brackets exist for that event, so the filter row has nothing to show.
+      function eventBracketPrefixes(eventId) {
+        const prefixes = new Set();
+        state.matches.forEach((m) => {
+          if (m.eventId !== eventId) return;
+          const p = matchCategoryPrefix(m);
+          if (p) prefixes.add(p);
+        });
+        return [...prefixes].sort(
+          (a, b) => ageBandSortKey(a) - ageBandSortKey(b),
+        );
+      }
+
       // Every distinct resolved {name, age} across a set of matches, deduped.
       function uniquePlayersFromMatches(matches) {
         const players = new Map();
@@ -9019,9 +9085,16 @@
       // starts at the same N); "Above N"/"N and above" -> just past N (so it
       // lands after an "Under N" band with the same N, e.g. carrom_men's
       // "Under 46" then "Above 46"); anything else ("N to M", "N-M Bracket")
-      // uses its first number as-is (its lower bound).
+      // uses its first number as-is (its lower bound). Squash's Kids
+      // bracket uses the internal key "U15" (matchCategoryPrefix's own
+      // squash special-case) rather than the text "Under 15", so it needs
+      // its own check here too -- without it, "U15" and "15-25 Bracket"
+      // both fall through to the same bare-number key (15) and tie,
+      // leaving their relative order to depend on match insertion order
+      // instead of consistently putting Kids first.
       function ageBandSortKey(prefix) {
         if (!prefix) return 0;
+        if (prefix === "U15") return 14.5;
         const n = prefix.match(/\d+/);
         if (!n) return 0;
         if (/^under\b/i.test(prefix)) return +n[0] - 0.5;
@@ -10785,11 +10858,45 @@
               const standingsBtnHtml = eventGroupStageRounds(ev.id).length
                 ? `<div class="standings-btn-row"><button type="button" class="standings-btn" data-standings="${ev.id}">🏆 Standings</button></div>`
                 : "";
+              // Age-bracket filter row -- only for events that actually
+              // split into brackets (matchCategoryPrefix returns "" for
+              // single-division events like TT Women's/Doubles, Carrom
+              // Women's/Doubles, so eventBracketPrefixes is empty and this
+              // stays blank for them). The active bracket is colored with
+              // the same hue its matches' division pill already uses
+              // elsewhere, so selecting "Under 26" highlights in the same
+              // color as Under 26 match cards.
+              const brackets = eventBracketPrefixes(ev.id);
+              const activeBracket = state.eventBracketFilter[ev.id] || "";
+              const bracketFilterHtml = brackets.length
+                ? `<div class="bracket-filter-row">
+              <button type="button" class="bracket-chip all ${activeBracket ? "" : "active"}" data-eventid="${ev.id}" data-bracket="">All</button>
+              ${brackets
+                .map((p) => {
+                  const isActive = activeBracket === p;
+                  const sample = evMatches.find(
+                    (m) => matchCategoryPrefix(m) === p,
+                  );
+                  const style = isActive && sample
+                    ? divisionColorStyle(matchDivisionHue(sample))
+                    : null;
+                  const inlineStyle = style
+                    ? ` style="background:${style.bg};color:${style.text};border-color:${style.border};"`
+                    : "";
+                  return `<button type="button" class="bracket-chip ${isActive ? "active" : ""}" data-eventid="${ev.id}" data-bracket="${escapeHtml(p)}"${inlineStyle}>${escapeHtml(bracketDisplayLabel(ev.id, p))}</button>`;
+                })
+                .join("")}
+            </div>`
+                : "";
+              const visibleMatches = activeBracket
+                ? evMatches.filter((m) => matchCategoryPrefix(m) === activeBracket)
+                : evMatches;
               bodyHtml =
                 resultsSummaryHtml +
                 progressHtml +
                 standingsBtnHtml +
-                evMatches.map(renderMatchRow).join("");
+                bracketFilterHtml +
+                visibleMatches.map(renderMatchRow).join("");
 
               const liveMatches = evMatches.filter((m) => m.status === "live");
               if (liveMatches.length) {
@@ -10843,6 +10950,16 @@
           btn.addEventListener("click", (e) => {
             e.stopPropagation();
             openStandingsModal(btn.dataset.standings);
+          });
+        });
+        wrap.querySelectorAll(".bracket-chip").forEach((btn) => {
+          btn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            const eventId = btn.dataset.eventid;
+            const bracket = btn.dataset.bracket;
+            if (bracket) state.eventBracketFilter[eventId] = bracket;
+            else delete state.eventBracketFilter[eventId];
+            render();
           });
         });
         attachMatchHandlers(wrap);
