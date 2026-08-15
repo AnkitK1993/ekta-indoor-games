@@ -345,6 +345,26 @@ group/pool standings are tallied; they are not auto-computed from match results.
   `pendingPlayers`, excluding anything still `tbd`/`manual`). Tapping a name shows that
   player's full schedule + results (same match-card rendering as search results) plus a
   tappable PAID/UNPAID badge that opens a small popup to set `playerPayments`.
+  **"✎ Edit Name" renames a player everywhere** (user request) — since a name isn't stored
+  once in a central player record but denormalized into every `fixed` `playerA`/`playerB`
+  slot the player appears in (each match carries its own `{name, age}` copy), a rename has
+  to walk every match and patch all of it in one go: any `fixed` slot with that exact name,
+  any `overrideA`/`overrideB` matching it, and any `winnerName`/`loserName` matching it
+  (so a downstream `placeholder` match, e.g. a Final referencing a semifinal this player
+  won, keeps showing the corrected name — same reasoning as the stale-override fix above).
+  `computeMatchRenamePatches`/`computePendingPlayerRenames` compute what would change (also
+  used to preview the affected match count before the admin confirms);
+  `renamePlayerEverywhere` commits it via `writeBatch` (chunked at 450 ops, same pattern as
+  the Import/Export override flow), fire-and-forget like every other match write. The
+  `playerPayments` doc is keyed by name (doc ID), so renaming creates a new doc under the
+  new ID and deletes the old one rather than patching a field; a player with no payment
+  record (defaults to UNPAID) has nothing to carry over. A **"Rename Player?"** confirm
+  (`#pm-rename-confirm-modal`) shows the affected match count before committing — same
+  safety-net pattern as the match-level edit confirms — and warns (without blocking) if the
+  new name already belongs to a different existing player, since that would merge their
+  schedules together. Age is preserved (only the name field changes). Verified against real
+  SEED_DATA: a player entered in both TT Men's and Carrom Men's (13 matches total across
+  the two events) renames correctly in every one, with age intact.
 - 2-second toast banner on any match transitioning to `status:"completed"`, format:
   "🏆 **Winner** defeated Loser — Event, Round".
 - Every match card shows **"Match N"** (from `matchNumber`) instead of the raw `code`.

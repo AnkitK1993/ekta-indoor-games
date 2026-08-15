@@ -1144,6 +1144,17 @@
         text-transform: uppercase;
         letter-spacing: 0.01em;
       }
+      .pm-rename-link {
+        display: inline-block;
+        font-size: 11px;
+        font-weight: 700;
+        color: var(--info);
+        cursor: pointer;
+        margin-top: 2px;
+      }
+      .pm-rename-link:hover {
+        text-decoration: underline;
+      }
       .payment-badge {
         font-size: 10px;
         font-weight: 700;
@@ -1817,6 +1828,48 @@
         <div class="modal-actions">
           <button class="btn ghost" id="payment-cancel" style="flex: 1">
             Cancel
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Rename Player Modal -->
+    <div class="modal-overlay" id="pm-rename-modal">
+      <div class="modal">
+        <button class="modal-close" id="pm-rename-close">✕</button>
+        <h2>Rename Player</h2>
+        <p class="sub">
+          Renaming updates this player's name everywhere in the schedule —
+          every match, payment record, and roster entry they appear in.
+        </p>
+        <div class="field">
+          <label>New Name</label>
+          <input
+            type="text"
+            id="pm-rename-input"
+            placeholder="Player / pair name"
+            autocomplete="off"
+          />
+        </div>
+        <div class="modal-actions">
+          <button class="btn ghost" id="pm-rename-cancel">Cancel</button>
+          <button class="btn primary" id="pm-rename-save">Save</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Rename Player Confirm Modal -->
+    <div class="modal-overlay" id="pm-rename-confirm-modal">
+      <div class="modal">
+        <button class="modal-close" id="pm-rename-confirm-close">✕</button>
+        <h2>Rename Player?</h2>
+        <p class="sub" id="pm-rename-confirm-sub"></p>
+        <div class="modal-actions">
+          <button class="btn ghost" id="pm-rename-confirm-cancel" style="flex: 1">
+            Cancel
+          </button>
+          <button class="btn primary" id="pm-rename-confirm-go" style="flex: 1">
+            Rename
           </button>
         </div>
       </div>
@@ -8549,6 +8602,7 @@
         pmSearchQuery: "",
         pmSelectedPlayer: null, // player name, or null when showing the list
         pmPaymentTarget: null, // player name the payment modal is open for
+        pmRenameTarget: null, // player name the rename modal is open for
         viewPlayerName: null, // non-admin: player whose profile (stats + schedule) is open, or null
       };
 
@@ -10867,7 +10921,10 @@
         detailEl.innerHTML = `
     <button class="pm-back-inline" id="pm-detail-back">← All players</button>
     <div class="pm-player-card">
-      <div class="pm-player-name">${escapeHtml(name)}</div>
+      <div>
+        <div class="pm-player-name">${escapeHtml(name)}</div>
+        <span class="pm-rename-link" id="pm-rename-btn">✎ Edit Name</span>
+      </div>
       <button class="payment-badge tappable ${paid ? "paid" : "unpaid"}" id="pm-payment-btn">${paid ? "✓ PAID" : "UNPAID"}</button>
     </div>
     ${playerStatsHtml(name)}
@@ -10883,6 +10940,9 @@
         document
           .getElementById("pm-payment-btn")
           .addEventListener("click", () => openPaymentModal(name));
+        document
+          .getElementById("pm-rename-btn")
+          .addEventListener("click", () => openRenameModal(name));
         attachMatchHandlers(detailEl);
       }
 
@@ -10961,6 +11021,151 @@
       document
         .getElementById("payment-cancel")
         .addEventListener("click", closePaymentModal);
+
+      /* ===================== RENAME PLAYER (Players Master) ===================== */
+      // A player's name isn't stored once in a central player record -- it's
+      // denormalized into every `fixed` playerA/playerB slot they appear in
+      // (each match carries its own {name, age} copy), plus any override/
+      // winnerName/loserName field that happens to match it verbatim.
+      // Renaming has to walk every match and patch all of those in one
+      // batch, or the schedule would show the old name in some matches and
+      // the new one in others.
+      function computeMatchRenamePatches(oldName, newName) {
+        const patches = [];
+        state.matches.forEach((m) => {
+          const patch = {};
+          if (m.playerA && m.playerA.type === "fixed" && m.playerA.name === oldName)
+            patch.playerA = { ...m.playerA, name: newName };
+          if (m.playerB && m.playerB.type === "fixed" && m.playerB.name === oldName)
+            patch.playerB = { ...m.playerB, name: newName };
+          if (m.overrideA === oldName) patch.overrideA = newName;
+          if (m.overrideB === oldName) patch.overrideB = newName;
+          if (m.winnerName === oldName) patch.winnerName = newName;
+          if (m.loserName === oldName) patch.loserName = newName;
+          if (Object.keys(patch).length) patches.push({ matchId: m.matchId, patch });
+        });
+        return patches;
+      }
+      // pendingPlayers is currently empty for every event (nothing's
+      // un-bracketed right now) but handled for correctness in case that
+      // ever changes -- one doc per event, `players` is the whole array, so
+      // a rename has to rewrite the array rather than patch one entry.
+      function computePendingPlayerRenames(oldName, newName) {
+        const out = [];
+        Object.entries(state.pendingPlayers || {}).forEach(([eventId, players]) => {
+          if (!Array.isArray(players)) return;
+          let changed = false;
+          const updated = players.map((p) => {
+            if (p && p.name === oldName) {
+              changed = true;
+              return { ...p, name: newName };
+            }
+            return p;
+          });
+          if (changed) out.push({ eventId, players: updated });
+        });
+        return out;
+      }
+      function renamePlayerEverywhere(oldName, newName) {
+        const matchPatches = computeMatchRenamePatches(oldName, newName);
+        const pendingRenames = computePendingPlayerRenames(oldName, newName);
+        const oldPayment = state.playerPayments[oldName];
+
+        const ops = [];
+        matchPatches.forEach(({ matchId, patch }) =>
+          ops.push((b) => b.set(doc(db, "matches", matchId), patch, { merge: true })),
+        );
+        pendingRenames.forEach(({ eventId, players }) =>
+          ops.push((b) =>
+            b.set(doc(db, "pendingPlayers", eventId), { players }, { merge: true }),
+          ),
+        );
+        // playerPayments is keyed by name (doc ID), so a rename has to
+        // create a new doc under the new ID and drop the old one rather
+        // than patch a field -- a player with no payment record at all
+        // (defaults to UNPAID) has nothing to carry over here.
+        if (oldPayment) {
+          ops.push((b) =>
+            b.set(doc(db, "playerPayments", playerDocId(newName)), {
+              ...oldPayment,
+              name: newName,
+              updatedAt: serverTimestamp(),
+            }),
+          );
+          ops.push((b) => b.delete(doc(db, "playerPayments", playerDocId(oldName))));
+        }
+
+        Promise.all(
+          chunkArray(ops, 450).map((chunk) => {
+            const b = writeBatch(db);
+            chunk.forEach((fn) => fn(b));
+            return b.commit();
+          }),
+        ).catch((e) => {
+          console.error(e);
+          toast("⚠️ Couldn't rename player everywhere — please try again", "error");
+        });
+      }
+
+      function openRenameModal(name) {
+        state.pmRenameTarget = name;
+        document.getElementById("pm-rename-input").value = name;
+        document.getElementById("pm-rename-modal").classList.add("show");
+      }
+      function closeRenameModal() {
+        document.getElementById("pm-rename-modal").classList.remove("show");
+      }
+      document
+        .getElementById("pm-rename-close")
+        .addEventListener("click", closeRenameModal);
+      document
+        .getElementById("pm-rename-cancel")
+        .addEventListener("click", closeRenameModal);
+
+      let pendingRename = null; // {oldName, newName} awaiting confirm in pm-rename-confirm-modal
+      document.getElementById("pm-rename-save").addEventListener("click", () => {
+        const oldName = state.pmRenameTarget;
+        const newName = document.getElementById("pm-rename-input").value.trim();
+        if (!oldName || !newName || newName === oldName) {
+          closeRenameModal();
+          return;
+        }
+        const matchCount = computeMatchRenamePatches(oldName, newName).length;
+        const collides =
+          collectAllPlayerNames().includes(newName) && newName !== oldName;
+        pendingRename = { oldName, newName };
+        document.getElementById("pm-rename-confirm-sub").textContent =
+          `Rename "${oldName}" to "${newName}" across ${matchCount} match${matchCount === 1 ? "" : "es"}?` +
+          (collides
+            ? ` ⚠ "${newName}" already exists as a separate player — this will merge their schedules together.`
+            : "");
+        closeRenameModal();
+        document.getElementById("pm-rename-confirm-modal").classList.add("show");
+      });
+      function closeRenameConfirmModal() {
+        document.getElementById("pm-rename-confirm-modal").classList.remove("show");
+        pendingRename = null;
+      }
+      document
+        .getElementById("pm-rename-confirm-close")
+        .addEventListener("click", closeRenameConfirmModal);
+      document
+        .getElementById("pm-rename-confirm-cancel")
+        .addEventListener("click", closeRenameConfirmModal);
+      document
+        .getElementById("pm-rename-confirm-go")
+        .addEventListener("click", () => {
+          const pending = pendingRename;
+          closeRenameConfirmModal();
+          if (!pending) return;
+          renamePlayerEverywhere(pending.oldName, pending.newName);
+          if (state.pmSelectedPlayer === pending.oldName)
+            state.pmSelectedPlayer = pending.newName;
+          toast(
+            `✅ Renamed to <b>${escapeHtml(pending.newName)}</b> everywhere in the schedule`,
+          );
+          render();
+        });
 
       document.getElementById("search-toggle").addEventListener("click", () => {
         const searchCard = document.getElementById("search-card");
