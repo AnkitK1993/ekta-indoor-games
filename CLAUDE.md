@@ -498,6 +498,17 @@ group/pool standings are tallied; they are not auto-computed from match results.
     dropdown on a genuine click-away, and without the `mousedown` guard that same handler
     was firing for in-dropdown clicks too, closing "Show more"'s expanded list right back
     up a moment after it opened.
+- **Player/match search matches every query word independently, not the query as one
+  substring** (`nameMatchesQuery`, used by the header search's results (`renderSearch`)
+  and its autocomplete dropdown (`updateSearchSuggestions`), and Players Master's search
+  (`renderPlayerListView`) — user-reported bug: a doubles pair's stored name is one
+  player's name, then `" & "`, then the other's (e.g. `"Vinay Sawant & Amar Jain"`), so
+  typing both names together in the order that felt natural (e.g. `"Amar Vinay"`) found
+  nothing under a plain `.includes(query)` check even though both players genuinely are
+  in that name — the words just weren't contiguous in query order. `nameMatchesQuery`
+  splits the query on whitespace and requires every token to appear *somewhere* in the
+  name, in any order, so `"vinay"`, `"amar"`, `"vinay amar"`, and `"amar vinay"` all find
+  the same pair. A single-word query behaves exactly like the old plain substring search.
 - **Known open risk: nested `backdrop-filter` on `.search-card`/`#search-dropdown`
   bled the sport filter chips through the player-search dropdown on iOS Safari**
   (reported with a screenshot) — `.search-card` sits inside `header.app-header`,
@@ -524,6 +535,56 @@ group/pool standings are tallied; they are not auto-computed from match results.
   it from SEED_DATA if deleted by mistake (acceptable since that button upserts by ID and
   doesn't touch unrelated docs — unlike the Override flow, which wipes and rewrites
   everything and *does* still use a native `confirm()` — that one wasn't asked to change).
+- **"+ Add Match" button, scoped to `carrom_doubles`/`tt_doubles` only**
+  (`ADD_MATCH_EVENT_IDS`, `openAddMatchModal`/`#add-match-modal`) — admin-only, rendered
+  in the same `.standings-btn-row` slot as the 🏆 Standings button, right below it, inside
+  each of those two events' expanded body. Deliberately restricted to just these two
+  events (by user request): both are single, self-contained knockout brackets whose
+  `placeholder` refs never get read by any *other* event, so a hand-added match can't
+  desync some other bracket's dependency chain the way it could in the age-banded/
+  group-stage events (where a manual slot's standings computation walks the event's own
+  round-robin rounds and assumes the schedule matches what `SEED_DATA` originally laid
+  out). Each player field (`setupAddMatchPicker`) shows a suggestion dropdown of every
+  known tournament player (`addMatchPlayerPool` = `allTournamentPlayers()`, not scoped to
+  just this event — see below) — clicking a suggestion fills in both the name and age
+  fields — but free text is always allowed too, **same free-text-allowed pattern as the
+  Edit Name modal's `#edit-name-dropdown`** (reuses its `.search-dropdown`/`.search-option`
+  styling and mousedown/blur mechanics). This was deliberately changed from an earlier,
+  stricter version that *required* picking from the event's own existing players and
+  blocked Save otherwise — reverted by user request after a real case surfaced it: a
+  known real-world pairing (e.g. two players who between them have never yet appeared
+  together in any existing Carrom Doubles match in the live data) couldn't be entered at
+  all under the strict version, since neither the pool-scoping nor the hard gate had any
+  path to a name that isn't already attached to *this* event's matches. Only requirement
+  now is both name fields non-empty and not identical to each other; age is optional
+  free-typed input, pre-filled by a suggestion click but editable either way. Round, day,
+  time, and venue are also free text. Saving writes a brand-new match doc directly via
+  `setDoc` (fire-and-forget +
+  `.catch()` → toast, same pattern as every other admin write — see the multi-admin
+  write pattern above). `code`/`matchId` use `ADD<Date.now()>` rather than following the
+  round-specific `M<n>`/`QF<n>`/`SF<n>`/`FINAL` convention the rest of the schedule uses,
+  since that sidesteps needing to parse each event's existing code convention and stays
+  collision-free even if two admins add a match at the same moment (no transactions).
+  `matchNumber` has its own optional "Match #" field, pre-filled (but editable) with
+  `nextMatchNumberForEvent(eventId)` — the *lowest* number not currently in use in that
+  event, not just current-max-plus-one. This backfills a gap left by a deleted match
+  (by user request: delete "Round 1 Match 4" out of a 10-match Round 1, and the next
+  added match defaults to reclaiming 4, not becoming 11) before ever handing out a
+  number past the max; with no gaps it naturally falls back to max+1 (matches
+  1-10 present → next is 11). A live hint under the field (`renderAddMatchNumberHint`)
+  explains the blank-field default and flags — before Save, not just on Save — if the
+  admin types a number that collides with an existing match in the same event (two
+  matches both reading "Match 4" would be ambiguous everywhere the app displays it);
+  Save re-validates the same collision + positive-integer check regardless. Note
+  `matchNumber` is per-event, not per-round (see its own convention note above) — "Round
+  1 Match 4" only means the 4th match chronologically in that *event* happened to be a
+  Round 1 match, so reclaiming slot 4 for a re-added Round 1 match is correct even
+  though later rounds already occupy 11+.
+  Unlike a `SEED_DATA` edit, this is a live Firestore write picked up immediately by the
+  existing `matches` listener — it does **not** need a "Load Data"/Import-Override
+  re-sync, and it also does not touch `SEED_DATA` itself (so re-running "Load Data" would
+  not restore a match added this way, same as it wouldn't restore anything else that
+  only ever existed in Firestore).
 - **Homepage event ordering** (`eventProgressBucket()` + the sort step at the top of
   `renderEventsList`): events are grouped into 3 buckets — 0) has a live/completed match
   but isn't fully done (shown first), 1) nothing started yet (kept in the middle), 2) every

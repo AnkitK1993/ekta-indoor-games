@@ -1895,6 +1895,88 @@
       </div>
     </div>
 
+    <!-- Add Match Modal -->
+    <div class="modal-overlay" id="add-match-modal">
+      <div class="modal">
+        <button class="modal-close" id="add-match-close">✕</button>
+        <h2>Add Match</h2>
+        <p class="sub" id="add-match-sub"></p>
+        <div style="display: flex; gap: 10px">
+          <div class="field" style="flex: 2; position: relative">
+            <label>Player / Pair A</label>
+            <input
+              type="text"
+              id="add-match-a-input"
+              placeholder="Pick existing, or type a new name"
+              autocomplete="off"
+            />
+            <div class="search-dropdown hidden" id="add-match-a-dropdown"></div>
+          </div>
+          <div class="field" style="flex: 1">
+            <label>Age</label>
+            <input type="number" id="add-match-a-age" placeholder="Age" />
+          </div>
+        </div>
+        <div style="display: flex; gap: 10px">
+          <div class="field" style="flex: 2; position: relative">
+            <label>Player / Pair B</label>
+            <input
+              type="text"
+              id="add-match-b-input"
+              placeholder="Pick existing, or type a new name"
+              autocomplete="off"
+            />
+            <div class="search-dropdown hidden" id="add-match-b-dropdown"></div>
+          </div>
+          <div class="field" style="flex: 1">
+            <label>Age</label>
+            <input type="number" id="add-match-b-age" placeholder="Age" />
+          </div>
+        </div>
+        <div style="display: flex; gap: 10px">
+          <div class="field" style="flex: 2">
+            <label>Round</label>
+            <input
+              type="text"
+              id="add-match-round"
+              placeholder="e.g. Round 1, Quarterfinal, Semifinal, Final"
+              autocomplete="off"
+            />
+          </div>
+          <div class="field" style="flex: 1">
+            <label>Match #</label>
+            <input type="number" id="add-match-number" min="1" step="1" />
+          </div>
+        </div>
+        <div
+          id="add-match-number-hint"
+          style="font-size: 11.5px; color: var(--muted); margin: -8px 0 14px"
+        ></div>
+        <div style="display: flex; gap: 10px">
+          <div class="field" style="flex: 1">
+            <label>Day</label>
+            <select id="add-match-day">
+              <option value="Aug 15">Aug 15</option>
+              <option value="Aug 16">Aug 16</option>
+            </select>
+          </div>
+          <div class="field" style="flex: 1">
+            <label>Time</label>
+            <input type="text" id="add-match-time" placeholder="e.g. 9:00 AM" autocomplete="off" />
+          </div>
+        </div>
+        <div class="field">
+          <label>Venue</label>
+          <input type="text" id="add-match-venue" placeholder="e.g. Board 1 / Table 1" autocomplete="off" />
+        </div>
+        <div class="error-text" id="add-match-error"></div>
+        <div class="modal-actions">
+          <button class="btn ghost" id="add-match-cancel" style="flex: 1">Cancel</button>
+          <button class="btn primary" id="add-match-save" style="flex: 1">Add Match</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Standings Modal -->
     <div class="modal-overlay" id="standings-modal">
       <div class="modal">
@@ -10265,6 +10347,245 @@
           });
         });
 
+      /* ===================== ADD MATCH ===================== */
+      // Scoped to Carrom Doubles / TT Doubles by request -- both are
+      // single, self-contained knockout brackets that don't feed any
+      // placeholder ref outside their own event, so a hand-added match
+      // can't desync another event's dependency chain the way it could
+      // in the age-banded/group-stage events.
+      const ADD_MATCH_EVENT_IDS = new Set(["carrom_doubles", "tt_doubles"]);
+      let addMatchEventId = null;
+      let addMatchPlayerPool = []; // {name, age}[] -- every known tournament player, for suggestions only
+
+      // Lowest matchNumber not currently in use for this event, e.g. if a
+      // deleted match left a gap (1,2,3,_,5,6..10 -> 4 is free) that's
+      // offered back before ever handing out a brand-new number past the
+      // current max. Matches CLAUDE.md's matchNumber convention: ascending,
+      // scoped per event, not per round -- "Round 1 Match 4" just means the
+      // 4th match chronologically in this event happened to be a Round 1
+      // match, so a re-added Round 1 match correctly reclaims slot 4 even
+      // though later rounds already occupy 11+.
+      function nextMatchNumberForEvent(eventId) {
+        const nums = state.matches
+          .filter((m) => m.eventId === eventId && m.matchNumber != null)
+          .map((m) => m.matchNumber)
+          .sort((a, b) => a - b);
+        let expected = 1;
+        for (const n of nums) {
+          if (n === expected) expected++;
+          else if (n > expected) break;
+        }
+        return expected;
+      }
+
+      // Suggestion dropdown for convenience only, same free-text-allowed
+      // pattern as the Edit Name modal's #edit-name-dropdown -- clicking a
+      // suggestion fills in both the name AND age fields, but typing a name
+      // that isn't suggested (a real player whose live pairing doesn't
+      // match this repo's SEED_DATA yet, a walkover substitute, etc.) is
+      // always allowed too. Pool is every tournament player, not just this
+      // event's, since the whole reason to hand-add a match is often that
+      // the live bracket doesn't yet have this pairing under this event at
+      // all (see CLAUDE.md's Add Match section).
+      function setupAddMatchPicker(slotKey) {
+        const input = document.getElementById(`add-match-${slotKey}-input`);
+        const ageInput = document.getElementById(`add-match-${slotKey}-age`);
+        const list = document.getElementById(`add-match-${slotKey}-dropdown`);
+        function render(ignoreQuery) {
+          const query = input.value.trim().toLowerCase();
+          const matches = addMatchPlayerPool.filter(
+            (p) => ignoreQuery || p.name.toLowerCase().includes(query),
+          );
+          list.innerHTML = matches.length
+            ? matches
+                .slice(0, 20)
+                .map(
+                  (p) =>
+                    `<button type="button" class="search-option"><strong>${escapeHtml(p.name)}</strong>${p.age ? `<small>Age ${p.age}</small>` : ""}</button>`,
+                )
+                .join("")
+            : `<div class="search-empty">No matching players found — you can still type a new name.</div>`;
+          list.classList.remove("hidden");
+          list.querySelectorAll(".search-option").forEach((btn, i) => {
+            btn.addEventListener("click", (e) => {
+              e.stopPropagation();
+              const player = matches[i];
+              input.value = player.name;
+              ageInput.value = player.age || "";
+              list.classList.add("hidden");
+            });
+          });
+        }
+        input.addEventListener("input", () => render(false));
+        input.addEventListener("focus", () => render(true));
+        input.addEventListener("blur", () => {
+          setTimeout(() => list.classList.add("hidden"), 150);
+        });
+        // Same mousedown-preventDefault guard as edit-name-dropdown -- keeps
+        // focus on the input for a suggestion click so the blur handler
+        // above doesn't close the list out from under it.
+        list.addEventListener("mousedown", (e) => e.preventDefault());
+        return {
+          reset() {
+            input.value = "";
+            ageInput.value = "";
+            list.classList.add("hidden");
+          },
+        };
+      }
+      const addMatchPickerA = setupAddMatchPicker("a");
+      const addMatchPickerB = setupAddMatchPicker("b");
+
+      // Live hint under the Match # field -- flags a collision with an
+      // existing match immediately (rather than only on Save), and explains
+      // where the pre-filled default number came from.
+      function renderAddMatchNumberHint() {
+        const eventId = addMatchEventId;
+        const hintEl = document.getElementById("add-match-number-hint");
+        if (!eventId) {
+          hintEl.textContent = "";
+          return;
+        }
+        const raw = document.getElementById("add-match-number").value.trim();
+        if (!raw) {
+          hintEl.textContent = `Leave blank to auto-fill the next available number (${nextMatchNumberForEvent(eventId)}).`;
+          return;
+        }
+        const n = parseInt(raw, 10);
+        const taken =
+          Number.isInteger(n) &&
+          state.matches.some((m) => m.eventId === eventId && m.matchNumber === n);
+        hintEl.textContent = taken
+          ? `⚠ Match ${n} already exists in this event — pick another number or clear this field.`
+          : "";
+      }
+      document
+        .getElementById("add-match-number")
+        .addEventListener("input", renderAddMatchNumberHint);
+
+      function openAddMatchModal(eventId) {
+        addMatchEventId = eventId;
+        const ev = eventById(eventId);
+        addMatchPlayerPool = allTournamentPlayers();
+        document.getElementById("add-match-sub").textContent =
+          `New match in ${ev ? ev.name : eventId}. Pick a suggested player or type a new name.`;
+        addMatchPickerA.reset();
+        addMatchPickerB.reset();
+        document.getElementById("add-match-round").value = "";
+        document.getElementById("add-match-number").value =
+          nextMatchNumberForEvent(eventId);
+        document.getElementById("add-match-day").value = "Aug 16";
+        document.getElementById("add-match-time").value = "";
+        document.getElementById("add-match-venue").value = "";
+        document.getElementById("add-match-error").textContent = "";
+        renderAddMatchNumberHint();
+        document.getElementById("add-match-modal").classList.add("show");
+      }
+      function closeAddMatchModal() {
+        document.getElementById("add-match-modal").classList.remove("show");
+        addMatchEventId = null;
+      }
+      document
+        .getElementById("add-match-close")
+        .addEventListener("click", closeAddMatchModal);
+      document
+        .getElementById("add-match-cancel")
+        .addEventListener("click", closeAddMatchModal);
+      document.getElementById("add-match-save").addEventListener("click", () => {
+        const eventId = addMatchEventId;
+        if (!eventId) return;
+        const errEl = document.getElementById("add-match-error");
+        const aName = document.getElementById("add-match-a-input").value.trim();
+        const aAgeRaw = document.getElementById("add-match-a-age").value.trim();
+        const bName = document.getElementById("add-match-b-input").value.trim();
+        const bAgeRaw = document.getElementById("add-match-b-age").value.trim();
+        const round = document.getElementById("add-match-round").value.trim();
+        const numberRaw = document.getElementById("add-match-number").value.trim();
+        const day = document.getElementById("add-match-day").value;
+        const time = document.getElementById("add-match-time").value.trim();
+        const venue = document.getElementById("add-match-venue").value.trim();
+        if (!aName || !bName) {
+          errEl.textContent = "Both player names are required.";
+          return;
+        }
+        if (aName === bName) {
+          errEl.textContent = "Player A and Player B can't be the same.";
+          return;
+        }
+        if (!round || !time) {
+          errEl.textContent = "Round and time are required.";
+          return;
+        }
+        // Blank -> the lowest number not currently in use for this event
+        // (backfills a gap left by a deleted match before ever handing out
+        // a number past the current max, see nextMatchNumberForEvent). A
+        // number the admin *did* type must not collide with an existing
+        // match in the same event -- two matches both reading "Match 4"
+        // would be genuinely ambiguous everywhere the app displays it.
+        let matchNumber;
+        if (!numberRaw) {
+          matchNumber = nextMatchNumberForEvent(eventId);
+        } else {
+          matchNumber = parseInt(numberRaw, 10);
+          if (!Number.isInteger(matchNumber) || matchNumber < 1) {
+            errEl.textContent = "Match # must be a positive whole number.";
+            return;
+          }
+          const collision = state.matches.some(
+            (m) => m.eventId === eventId && m.matchNumber === matchNumber,
+          );
+          if (collision) {
+            errEl.textContent = `Match ${matchNumber} already exists in this event.`;
+            return;
+          }
+        }
+        // Existing codes are round-specific (M1, QF1, SF1, FINAL) and only
+        // guaranteed unique within their own event's naming convention -- a
+        // Date.now()-based code sidesteps needing to know that convention
+        // and stays collision-free even if two admins add a match at the
+        // same moment (see CLAUDE.md: 3-4 admins share one login, no
+        // transactions/locking).
+        const code = `ADD${Date.now()}`;
+        const matchId = `${eventId}_${code}`;
+        const match = {
+          matchId,
+          eventId,
+          round,
+          code,
+          time,
+          venue,
+          day,
+          playerA: {
+            type: "fixed",
+            name: aName,
+            age: aAgeRaw ? Number(aAgeRaw) : null,
+          },
+          playerB: {
+            type: "fixed",
+            name: bName,
+            age: bAgeRaw ? Number(bAgeRaw) : null,
+          },
+          status: "upcoming",
+          winnerSlot: null,
+          winnerName: null,
+          winnerAge: null,
+          loserName: null,
+          overrideA: null,
+          overrideB: null,
+          completedAt: null,
+          matchNumber,
+          updatedAt: serverTimestamp(),
+        };
+        // Fire-and-forget, same pattern as every other admin write in this
+        // app (confirmWinner, setMatchStatus, resetMatch, ...) -- never
+        // awaited before closing the modal, see CLAUDE.md.
+        setDoc(doc(db, "matches", matchId), match).catch((e) => {
+          console.error(e);
+          toast("⚠️ Couldn't add match — please try again", "error");
+        });
+        closeAddMatchModal();
+      });
+
       /* ===================== STANDINGS ===================== */
       function openStandingsModal(eventId) {
         const ev = eventById(eventId);
@@ -10931,6 +11252,10 @@
               const standingsBtnHtml = eventGroupStageRounds(ev.id).length
                 ? `<div class="standings-btn-row"><button type="button" class="standings-btn" data-standings="${ev.id}">🏆 Standings</button></div>`
                 : "";
+              const addMatchBtnHtml =
+                state.isAdmin && ADD_MATCH_EVENT_IDS.has(ev.id)
+                  ? `<div class="standings-btn-row"><button type="button" class="standings-btn" data-addmatch="${ev.id}">+ Add Match</button></div>`
+                  : "";
               // Age-bracket filter row -- only for events that actually
               // split into brackets (matchCategoryPrefix returns "" for
               // single-division events like TT Women's/Doubles, Carrom
@@ -10968,6 +11293,7 @@
                 resultsSummaryHtml +
                 progressHtml +
                 standingsBtnHtml +
+                addMatchBtnHtml +
                 bracketFilterHtml +
                 visibleMatches.map(renderMatchRow).join("");
 
@@ -11025,6 +11351,12 @@
             openStandingsModal(btn.dataset.standings);
           });
         });
+        wrap.querySelectorAll("[data-addmatch]").forEach((btn) => {
+          btn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            openAddMatchModal(btn.dataset.addmatch);
+          });
+        });
         wrap.querySelectorAll(".bracket-chip").forEach((btn) => {
           btn.addEventListener("click", (e) => {
             e.stopPropagation();
@@ -11039,6 +11371,19 @@
       }
 
       /* ===================== RENDER: SEARCH ===================== */
+      // A plain single-substring `.includes(query)` can't find a doubles
+      // pair by typing both names together (e.g. "Vinay Amar") since the
+      // stored name is "Vinay Sawant & Amar Jain" -- "Vinay Amar" is not a
+      // substring of that even though both players genuinely are in it.
+      // Splitting the query on whitespace and requiring every token to
+      // appear somewhere in the name (any order) finds it either way,
+      // while a single-word query behaves exactly as a plain substring
+      // search always did.
+      function nameMatchesQuery(name, query) {
+        const lower = (name || "").toLowerCase();
+        const tokens = query.trim().toLowerCase().split(/\s+/).filter(Boolean);
+        return tokens.length > 0 && tokens.every((t) => lower.includes(t));
+      }
       function renderSearch() {
         const q = state.searchQuery.trim().toLowerCase();
         const resultsWrap = document.getElementById("search-results");
@@ -11057,9 +11402,9 @@
 
         const matched = state.matches
           .filter((m) => {
-            const a = resolveSlot(m, "A").name.toLowerCase();
-            const b = resolveSlot(m, "B").name.toLowerCase();
-            return a.includes(q) || b.includes(q);
+            const a = resolveSlot(m, "A").name;
+            const b = resolveSlot(m, "B").name;
+            return nameMatchesQuery(a, q) || nameMatchesQuery(b, q);
           })
           .sort(compareMatches);
 
@@ -11067,7 +11412,7 @@
         const pendingMatches = [];
         Object.entries(state.pendingPlayers).forEach(([eid, players]) => {
           players.forEach((p) => {
-            if (p.name.toLowerCase().includes(q)) {
+            if (nameMatchesQuery(p.name, q)) {
               pendingMatches.push({ eid, name: p.name, age: p.age });
             }
           });
@@ -11247,7 +11592,7 @@
         const allNames = collectAllPlayerNames();
         const q = state.pmSearchQuery.trim().toLowerCase();
         const filtered = q
-          ? allNames.filter((n) => n.toLowerCase().includes(q))
+          ? allNames.filter((n) => nameMatchesQuery(n, q))
           : allNames;
 
         document.getElementById("pm-count").textContent =
@@ -11593,7 +11938,7 @@
 
         const suggestions = [...names]
           .sort((a, b) => a.localeCompare(b))
-          .filter((name) => name.toLowerCase().includes(query))
+          .filter((name) => nameMatchesQuery(name, query))
           .slice(0, 12);
 
         if (!suggestions.length) {
