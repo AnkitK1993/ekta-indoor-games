@@ -57,53 +57,17 @@ names, and import/export the whole dataset as JSON.
   backgrounded) since that toast is for catching a *live* transition, not
   catching up after the fact.
 
-## Automated Firestore backups
-- **`.github/workflows/firestore-backup.yml`** runs `scripts/backup-firestore.mjs`
-  on a schedule (every 4 hours, cron `0 */4 * * *`, plus manual
-  `workflow_dispatch`) and commits the result to `data-backups/backup-<ISO
-  timestamp>.json` if anything changed. This is deliberately broader than the
-  admin's own **⇅ Import/Export** screen's *export* side, which only round-trips
-  `events`/`matches`/`pendingPlayers` as `.xlsx` — the scheduled backup also
-  captures `playerPayments`, which the in-app `.xlsx` export doesn't touch at all.
-  The workflow prunes to the most recent 30 snapshots (~5 days at the default
-  cadence) so the repo doesn't grow unbounded.
-- **Setup required (one-time, can't be done from this session):** create a
-  Firebase/GCP service account with **read-only** Firestore access
-  (`roles/datastore.viewer` is enough — this key lives in GitHub Actions, so
-  keep its permissions minimal), download its JSON key, and add the full JSON
-  as a GitHub Actions secret named `FIREBASE_BACKUP_SERVICE_ACCOUNT_KEY` on
-  this repo (Settings → Secrets and variables → Actions). Without that
-  secret the workflow will fail every run with an auth error.
-- **Restoring, in-app (the normal path):** the **⇅ Import/Export** modal has a
-  second section, **"Restore From Backup Snapshot"**, below the existing
-  `.xlsx` import — "🕐 Browse Snapshots…" lists `data-backups/` via GitHub's
-  public, unauthenticated, CORS-enabled Contents API (`BACKUP_REPO`/
-  `BACKUP_BRANCH` consts near `firebaseConfig`; no token needed since the repo
-  is public), auto-loads the most recent one, and shows a picker (`<select>`)
-  for older ones. Picking a snapshot fetches its raw JSON, and "Override With
-  Snapshot" does the same delete-all-then-rewrite as the `.xlsx` override —
-  except it also wipes and rewrites `playerPayments`, since a snapshot (unlike
-  an `.xlsx` file) actually carries that collection. `pendingImportData`/
-  `pendingImportSource`/the override button/its confirm-and-write handler are
-  now shared between both the `.xlsx` and snapshot paths (see `io-override-btn`
-  click handler) — the `playerPayments` collection is only touched when
-  `pendingImportData.playerPayments` is present, so `.xlsx` imports still never
-  touch payment records, exactly as before. Choosing a file clears any pending
-  snapshot selection and vice versa (only one source can be "loaded and ready
-  to override with" at a time).
-- **Restoring, from the command line (disaster recovery / no browser):**
-  `scripts/restore-firestore.mjs <backup-file.json> --confirm`, run locally by
-  an admin (never from CI). Same wipe-and-rewrite semantics across all 4
-  collections. Needs a service account key with *write* access
-  (`roles/datastore.user` or broader) via `FIREBASE_SERVICE_ACCOUNT_KEY` or
-  `GOOGLE_APPLICATION_CREDENTIALS` — deliberately kept separate from (and
-  more privileged than) the read-only key used by the scheduled backup, and
-  deliberately never automated/scheduled since restoring is a destructive,
-  human-in-the-loop decision. Running without `--confirm` prints a dry-run
-  summary and writes nothing.
-- `scripts/` has its own `package.json` (`firebase-admin`) — `npm install`
-  inside `scripts/` before running either script locally. Not part of the
-  deployed app; `index.html` doesn't depend on anything in `scripts/`.
+## Automated Firestore backups — removed
+The scheduled Firestore backup/restore feature (`.github/workflows/firestore-backup.yml`,
+`scripts/backup-firestore.mjs`, `scripts/restore-firestore.mjs`, and the in-app
+**⇅ Import/Export** modal's "Restore From Backup Snapshot" section) was removed by
+user request once the tournament ended — it's no longer needed. It never actually
+produced a snapshot (the `FIREBASE_BACKUP_SERVICE_ACCOUNT_KEY` secret this needed was
+never configured, so every scheduled run failed before committing anything), so there
+was nothing under `data-backups/` in this repo or in `AnkitK1993/test-ekta` (which the
+in-app snapshot picker's `BACKUP_REPO` constant pointed at) to delete either. The
+**⇅ Import/Export** modal's `.xlsx` export/import-and-override path is unrelated and
+still works exactly as before — only the snapshot-specific half was removed.
 
 ## Data model (see SEED_DATA constant embedded in the HTML file)
 - `events`: `{id, name, sport, category, gender, day, format, equipment, status}`.
@@ -138,8 +102,8 @@ names, and import/export the whole dataset as JSON.
   (the PAID/UNPAID badge in Players Master was removed by user request and replaced
   with phone numbers, see `playerPhones` below) — the collection, its `onSnapshot`
   listener (`state.playerPayments`), and the rename-migration logic are all still
-  live (kept for the automated Firestore backup and in case it's wanted back), just
-  nothing renders or writes `paid` from the app anymore. Was keyed by the exact
+  live (kept in case it's wanted back), just nothing renders or writes `paid` from
+  the app anymore. Was keyed by the exact
   display name string used in `playerA`/`playerB` `fixed`/`resolved` slots — doubles
   pairs were one combined name (e.g. `"Tanmay Sharma & Sankalp"`).
 - `playerPhones`: one doc per unique player/pair name (same doc-ID convention as
